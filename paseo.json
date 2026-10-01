@@ -1,0 +1,39 @@
+{
+  "worktree": {
+    "setup": [
+      "corepack enable 2>/dev/null || true",
+      "pnpm install --frozen-lockfile"
+    ]
+  },
+  "scripts": {
+    "test": {
+      "command": "pnpm test"
+    },
+    "typecheck": {
+      "command": "pnpm typecheck"
+    },
+    "lint": {
+      "command": "pnpm lint"
+    },
+    "build-web": {
+      "command": "pnpm build:web"
+    },
+    "verify": {
+      "command": "bash scripts/verify.sh"
+    }
+  },
+  "metadataGeneration": {
+    "title": {
+      "instructions": "Use a short task-shaped title, ideally 3-6 words. Name the subsystem when useful."
+    },
+    "branchName": {
+      "instructions": "Use <type>/<scope>-<short-desc>. Allowed types: feat, fix, refactor, test, docs, chore. Lowercase and hyphens only after the slash."
+    },
+    "commitMessage": {
+      "instructions": "Use Conventional Commits: <type>(<scope>): <concise description>. Do not mention AI or agents."
+    },
+    "pullRequest": {
+      "instructions": "Write a concise PR with sections: Summary, Why, Testing, Safety impact, Follow-up. Explicitly state skipped hardware validation or unsupported device assumptions."
+    }
+  }
+}

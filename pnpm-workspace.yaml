@@ -1,0 +1,10 @@
+# Phase 1 workspace members. `apps/mobile` is scaffolded but intentionally not
+# a workspace member yet: its native dependencies (react-native,
+# react-native-ble-plx) are installed when the native app phase starts, so the
+# Phase 1 CI install stays small and deterministic. See docs/decision-log.md
+# (D005) and PROJECT_STATUS.md.
+packages:
+  - "apps/web"
+  - "packages/*"
+minimumReleaseAgeExclude:
+  - vite@8.3.2

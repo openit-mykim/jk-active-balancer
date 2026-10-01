@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@jk-active-balancer/jk-protocol": ["./packages/jk-protocol/src/index.ts"],
+      "@jk-active-balancer/device-model": ["./packages/device-model/src/index.ts"],
+      "@jk-active-balancer/ble-core": ["./packages/ble-core/src/index.ts"],
+      "@jk-active-balancer/ble-web": ["./packages/ble-web/src/index.ts"],
+      "@jk-active-balancer/ble-react-native": ["./packages/ble-react-native/src/index.ts"],
+      "@jk-active-balancer/ui-common": ["./packages/ui-common/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/tests/**/*.ts",
+    "apps/web/src/**/*.ts",
+    "apps/web/src/**/*.tsx",
+    "apps/web/vite.config.ts"
+  ]
+}

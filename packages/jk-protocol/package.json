@@ -1,0 +1,13 @@
+{
+  "name": "@jk-active-balancer/jk-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "JK04 (JK-B2A16S) BLE protocol codec: constants, CRC, frame builder/assembler and decoders",
+  "license": "MIT",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

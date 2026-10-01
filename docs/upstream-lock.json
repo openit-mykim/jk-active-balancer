@@ -1,0 +1,20 @@
+{
+  "syssi/esphome-jk-bms": {
+    "tag": "3.0.0",
+    "commit": "b3016df3799095c0760e0a578d04dc7185a1c74a",
+    "license": "Apache-2.0",
+    "main_head_at_verification": "6a59290f839eb71a3adbf0724b6eb9d3e8fd0e62",
+    "verified": "2026-10-02",
+    "usage": "Protocol facts, packet layout and documented example frames only. No source code copied."
+  },
+  "react-native-ble-plx": {
+    "version": "3.5.1",
+    "verified": "2026-10-02",
+    "usage": "Native Android/iOS BLE transport (mobile app phase)."
+  },
+  "encap/better-bms-app": {
+    "license": null,
+    "usage": "Web Bluetooth UX reference only (design section 2.2). Code reuse is forbidden: the repository has no license.",
+    "verified": "2026-10-02"
+  }
+}

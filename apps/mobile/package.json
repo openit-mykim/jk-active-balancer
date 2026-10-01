@@ -1,0 +1,26 @@
+{
+  "name": "mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "React Native app for JK-B2A16S active balancer monitoring (Android/iOS)",
+  "license": "MIT",
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@jk-active-balancer/ble-core": "workspace:*",
+    "@jk-active-balancer/ble-react-native": "workspace:*",
+    "@jk-active-balancer/device-model": "workspace:*",
+    "@jk-active-balancer/jk-protocol": "workspace:*",
+    "@jk-active-balancer/ui-common": "workspace:*",
+    "react": "19.3.0",
+    "react-native": "0.87.1",
+    "react-native-ble-plx": "3.5.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}
