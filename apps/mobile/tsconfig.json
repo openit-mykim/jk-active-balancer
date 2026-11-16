@@ -28,8 +28,5 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "index.js"
-  ],
-  "exclude": [
-    "src/**/*.test.ts"
   ]
 }

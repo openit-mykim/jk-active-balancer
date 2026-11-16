@@ -8,7 +8,7 @@ export default defineConfig({
       "packages/*/src/**/*.test.ts",
       "apps/web/src/**/*.test.ts",
       "apps/web/src/**/*.test.tsx",
-      "apps/mobile/src/**/*.test.ts",
+      "tests/**/*.test.ts",
     ],
     reporters: ["default"],
   },

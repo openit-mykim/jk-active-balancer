@@ -47,7 +47,7 @@ BleManager: connect, notifications, disconnect events, scan errors, base64).
 `packages/device-model`, `packages/ui-common`: statistics, active-cell-count
 priority, history/CSV, cell grid layout and colour thresholds.
 
-`apps/mobile/src/fixtures.generated.test.ts` keeps the mobile demo fixtures in
+`tests/mobile-fixtures-drift.test.ts` keeps the mobile demo fixtures in
 sync with `fixtures/`.
 
 Mobile (not part of `pnpm test`):

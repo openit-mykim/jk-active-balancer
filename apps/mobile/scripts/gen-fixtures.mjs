@@ -1,6 +1,6 @@
 // Generates src/fixtures.generated.ts from ../../fixtures so the demo mode can
 // replay frames without a raw-file loader. Provenance is kept in the labels.
-// Run: npm run gen:fixtures   (a root vitest test fails if this file drifts)
+// Run: npm run gen:fixtures   (tests/mobile-fixtures-drift.test.ts fails if this file drifts)
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
