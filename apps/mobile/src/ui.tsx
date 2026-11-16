@@ -238,6 +238,57 @@ export function Button({ label, onPress, variant = "outlined", disabled }: { lab
   );
 }
 
+/**
+ * A whole row that toggles (Material pattern): the row is the accessible
+ * switch, so the touch target is the row (>= 48 dp) instead of the ~36 dp
+ * native Switch, which is hidden from accessibility.
+ */
+export function ToggleRow(props: { label: string; body?: string; glyph?: string; value: boolean; onChange: (v: boolean) => void }): ReactElement {
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={props.label}
+      accessibilityHint={props.body}
+      accessibilityState={{ checked: props.value }}
+      onPress={() => props.onChange(!props.value)}
+      style={({ pressed }) => [props.glyph ? st.listItem : st.inlineToggle, { gap: SPACE.lg }, pressed && st.pressed]}
+    >
+      {props.glyph ? <Glyph name={props.glyph} /> : null}
+      <View style={st.liText}>
+        <Txt role={props.glyph ? "body" : "label"} color={props.glyph ? "onSurface" : "onSurfaceMuted"}>
+          {props.label}
+        </Txt>
+        {props.body ? (
+          <Txt role="caption" color="onSurfaceMuted">
+            {props.body}
+          </Txt>
+        ) : null}
+      </View>
+      <SwitchVisual on={props.value} />
+    </Pressable>
+  );
+}
+
+/** Non-interactive switch drawing (the row carries the role and state). */
+function SwitchVisual({ on }: { on: boolean }): ReactElement {
+  return (
+    <View
+      importantForAccessibility="no-hide-descendants"
+      style={{
+        width: SPACE.xl + SPACE.lg,
+        height: SPACE.xl,
+        borderRadius: SPACE.md,
+        padding: SPACE.xs,
+        backgroundColor: on ? THEME.primary : THEME.switchTrackOff,
+        alignItems: on ? "flex-end" : "flex-start",
+        justifyContent: "center",
+      }}
+    >
+      <View style={{ width: SPACE.lg, height: SPACE.lg, borderRadius: SPACE.sm, backgroundColor: THEME.onSurface }} />
+    </View>
+  );
+}
+
 export function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }): ReactElement {
   return (
     <Switch

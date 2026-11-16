@@ -313,3 +313,22 @@ the current stack allows; the full checklist is `docs/mobile-standard-audit.md`.
 Open: the stack itself (React Native vs Kotlin + KMP) conflicts with the
 standard; the exception is proposed in `docs/adr/0001-mobile-stack-exception.md`
 and needs the owner's approval.
+
+## D018 - Standard gaps closed where possible: local crash log, a11y, perf, signing
+
+- Crash collection is device-local (ui-common `crash-log.ts`, schema-versioned,
+  last 10, stacks trimmed): RN global handler (installed first in `index.js`),
+  React error boundaries with a recover screen, web `error` /
+  `unhandledrejection`. Shown in 제어 > 오류 기록 and included in debug reports.
+  No external crash service: it would contradict "data never leaves this
+  device"; adding one is an owner decision.
+- Accessibility: switches are whole-row `ToggleRow`s (role switch, >= 48 dp)
+  instead of the ~36 dp native Switch; automated tree audit on the device and
+  axe-core on the web both report zero issues on every screen. Web card titles
+  are h2 (heading order).
+- The 1 s re-render tick only runs during the reconnect countdown.
+- Navigation timing is logged as `[perf] nav <tab> <ms>` when the developer
+  logger is on.
+- Release signing reads `JK_RELEASE_*` from the environment or
+  `~/.gradle/gradle.properties`; without them the build stays debug-signed and
+  the release guard blocks it.

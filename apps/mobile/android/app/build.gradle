@@ -92,6 +92,21 @@ android {
         versionName appVersionName
     }
     signingConfigs {
+        // Release key: never in the repository. Provided by environment
+        // variables (CI secrets) or ~/.gradle/gradle.properties:
+        //   JK_RELEASE_STORE_FILE, JK_RELEASE_STORE_PASSWORD,
+        //   JK_RELEASE_KEY_ALIAS, JK_RELEASE_KEY_PASSWORD
+        // Without them the release APK stays debug-signed and
+        // scripts/release-guard.sh blocks any upload (wiki mobile standard 7).
+        release {
+            def prop = { String name -> System.getenv(name) ?: (project.findProperty(name) as String) }
+            if (prop("JK_RELEASE_STORE_FILE")) {
+                storeFile file(prop("JK_RELEASE_STORE_FILE"))
+                storePassword prop("JK_RELEASE_STORE_PASSWORD")
+                keyAlias prop("JK_RELEASE_KEY_ALIAS")
+                keyPassword prop("JK_RELEASE_KEY_PASSWORD")
+            }
+        }
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
@@ -104,9 +119,8 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Release key when configured, otherwise the debug key (blocked by the release guard).
+            signingConfig signingConfigs.release.storeFile ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }

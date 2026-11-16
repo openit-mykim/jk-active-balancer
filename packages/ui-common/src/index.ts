@@ -6,3 +6,4 @@ export * from "./tokens";
 export * from "./i18n";
 export * from "./status";
 export * from "./prefs";
+export * from "./crash-log";

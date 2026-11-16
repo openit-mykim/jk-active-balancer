@@ -1,9 +1,10 @@
-import { type ReactElement, useState } from "react";
+import { type ReactElement, useState, useSyncExternalStore } from "react";
 import { Share, View } from "react-native";
 import { buildDebugExport } from "@jk-active-balancer/ble-core";
 import { cellLayoutHint, parseHex } from "@jk-active-balancer/jk-protocol";
 import { SPACE, freshnessLabel } from "@jk-active-balancer/ui-common";
-import { Button, Card, EmptyState, LockIcon, Row, Toggle, Txt, fmt, st } from "../ui";
+import { Button, Card, EmptyState, LockIcon, Row, ToggleRow, Txt, fmt, st } from "../ui";
+import { clearCrashes, getCrashes, subscribeCrashes } from "../crash-store";
 import type { ScreenProps } from "./context";
 
 /** 제어: locked maintenance workspace (jbd-bms-manager Control). */
@@ -12,6 +13,7 @@ export function Control(p: ScreenProps): ReactElement {
   const [unlocked, setUnlocked] = useState(false);
   const [includeRaw, setIncludeRaw] = useState(false);
   const [busy, setBusy] = useState(false);
+  const crashes = useSyncExternalStore(subscribeCrashes, getCrashes);
 
   if (!unlocked) {
     return (
@@ -28,6 +30,7 @@ export function Control(p: ScreenProps): ReactElement {
       events: handle.session.events,
       packetLog: handle.logger.entries,
       includeRawFrames: raw,
+      crashes,
     });
     void Share.share({ title: "jk-active-balancer debug", message: JSON.stringify(report, null, 2) });
   };
@@ -96,17 +99,28 @@ export function Control(p: ScreenProps): ReactElement {
         />
       </Card>
 
+      <Card title={t("crashLog")}>
+        {crashes.length === 0 ? (
+          <Txt role="label" color="onSurfaceMuted">
+            {t("crashLogEmpty")}
+          </Txt>
+        ) : (
+          crashes
+            .slice(-3)
+            .reverse()
+            .map((c) => <Row key={c.at + c.message} label={`${c.at.slice(0, 16).replace("T", " ")} · ${c.kind}${c.fatal ? " · fatal" : ""}`} value={c.message} />)
+        )}
+        <Txt role="caption" color="onSurfaceMuted">
+          {t("crashLogNote")}
+        </Txt>
+        {crashes.length > 0 && <Button variant="text" label={t("clearCrashLog")} onPress={clearCrashes} />}
+      </Card>
+
       <Card title={t("diagnostics")}>
         <Row label={t("frames")} value={`${snap.framesReceived} · ${freshnessLabel(language, snap.freshness)}`} />
         <Row label={t("parserErrors")} value={String(snap.parserErrors.length)} />
-        <View style={st.inlineToggle}>
-          <Txt>{t("rawLogger")}</Txt>
-          <Toggle label={t("rawLogger")} value={p.prefs.loggerEnabled} onChange={setLogger} />
-        </View>
-        <View style={st.inlineToggle}>
-          <Txt>{t("includeRaw")}</Txt>
-          <Toggle label={t("includeRaw")} value={includeRaw} onChange={setIncludeRaw} />
-        </View>
+        <ToggleRow label={t("rawLogger")} value={p.prefs.loggerEnabled} onChange={setLogger} />
+        <ToggleRow label={t("includeRaw")} value={includeRaw} onChange={setIncludeRaw} />
         <View style={st.btnRow}>
           <Button label={t("exportDebug")} onPress={() => share(includeRaw)} />
           <Button variant="text" label={t("clearLog")} onPress={() => handle.logger.clear()} />

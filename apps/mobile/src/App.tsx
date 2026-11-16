@@ -18,6 +18,7 @@ import {
 import { version as APP_VERSION } from "../package.json";
 import { ensureBlePermissions, onBluetoothStateChange } from "./ble/ble-manager";
 import { loadPrefs, savePrefs } from "./prefs-store";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { Balance } from "./screens/Balance";
 import { Control } from "./screens/Control";
 import type { ScreenProps } from "./screens/context";
@@ -29,6 +30,7 @@ import { type Mode, createSession } from "./session";
 import { Glyph, Txt } from "./ui";
 
 const SYSTEM_LOCALE = Intl.DateTimeFormat().resolvedOptions().locale;
+const nowMs = (): number => (globalThis as { performance?: { now(): number } }).performance?.now() ?? Date.now();
 
 /** Waits for stored preferences so the first frame is already in the chosen language. */
 export function App(): ReactElement {
@@ -39,7 +41,17 @@ export function App(): ReactElement {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" />
-      {loaded ? <Shell initialPrefs={loaded.prefs} prefsReset={loaded.reset} /> : <View style={styles.splash} />}
+      {loaded ? (
+        <ErrorBoundary
+          title={translate(resolveLanguage(loaded.prefs.language, SYSTEM_LOCALE), "errorTitle")}
+          body={translate(resolveLanguage(loaded.prefs.language, SYSTEM_LOCALE), "errorBody")}
+          retry={translate(resolveLanguage(loaded.prefs.language, SYSTEM_LOCALE), "retry")}
+        >
+          <Shell initialPrefs={loaded.prefs} prefsReset={loaded.reset} />
+        </ErrorBoundary>
+      ) : (
+        <View style={styles.splash} />
+      )}
     </SafeAreaProvider>
   );
 }
@@ -69,7 +81,23 @@ function Shell({ initialPrefs, prefsReset }: { initialPrefs: AppPrefs; prefsRese
     (onChange) => handle.session.subscribe(onChange),
     () => handle.session.snapshot,
   );
-  const [screen, setScreen] = useState<Screen>("overview");
+  const [screen, setScreenState] = useState<Screen>("overview");
+  // Wiki standard 5.8 performance budget: touch -> transition-complete frame
+  // < 300 ms. Measured only when the developer logger is on; read with
+  // `adb logcat -s ReactNativeJS | grep "[perf]"`.
+  const navStart = useRef<{ at: number; to: Screen } | null>(null);
+  const setScreen = (next: Screen): void => {
+    navStart.current = { at: nowMs(), to: next };
+    setScreenState(next);
+  };
+  useEffect(() => {
+    const start = navStart.current;
+    if (!start || start.to !== screen || !prefs.loggerEnabled) return;
+    navStart.current = null;
+    requestAnimationFrame(() => {
+      console.log(`[perf] nav ${screen} ${Math.round(nowMs() - start.at)} ms`);
+    });
+  }, [screen, prefs.loggerEnabled]);
   const [pending, setPending] = useState<"none" | "start" | "scan">("none");
   const [scanning, setScanning] = useState(false);
   const [found, setFound] = useState<readonly BleDevice[]>([]);
@@ -77,8 +105,17 @@ function Shell({ initialPrefs, prefsReset }: { initialPrefs: AppPrefs; prefsRese
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [now, setNow] = useState(Date.now());
 
+  // Tick only while a countdown is on screen: re-rendering every second for
+  // nothing costs battery and keeps the UI from ever being idle.
+  const ticking = snapshot.connection === "RECONNECT_WAIT";
   useEffect(() => {
+    if (!ticking) return;
+    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [ticking]);
+
+  useEffect(() => {
     // Foreground: re-validate the link (design section 21).
     const appState = AppState.addEventListener("change", (state) => {
       if (state === "active") handle.session.checkHealth();
@@ -91,7 +128,6 @@ function Shell({ initialPrefs, prefsReset }: { initialPrefs: AppPrefs; prefsRese
           })
         : () => undefined;
     return () => {
-      clearInterval(timer);
       appState.remove();
       unsubscribeBt();
       void handle.session.disconnect().catch(() => undefined);
