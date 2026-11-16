@@ -3,6 +3,7 @@ import { sum8 } from "@jk-active-balancer/jk-protocol";
 import { MockBleTransport } from "../src/mock-ble-transport";
 import { RawPacketLogger } from "../src/packet-logger";
 import { BmsSession } from "../src/session";
+import { buildDebugExport } from "../src/debug-export";
 import { BALANCED, BAD_CHECKSUM, DEVICE_INFO, SETTINGS, UNBALANCED } from "./helpers/fixtures";
 
 const DEVICE = { id: "mock-jk-b2a16s", name: "JK-B2A16S" };
@@ -206,5 +207,50 @@ describe("BmsSession", () => {
     await quiet.connect(DEVICE);
     expect(off.entries).toHaveLength(0);
     quiet.dispose();
+  });
+});
+
+describe("BmsSession with the JK-B4A24S default target (protocol not confirmed)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** SYNTHETIC: the upstream B2A16S device-info frame with the model renamed. */
+  function b4a24sDeviceInfo(): Uint8Array {
+    const info = Uint8Array.from(DEVICE_INFO);
+    const model = "JK-B4A24S";
+    for (let i = 0; i < model.length; i += 1) info[6 + i] = model.charCodeAt(i);
+    info[299] = sum8(info.subarray(0, 299));
+    return info;
+  }
+
+  it("identifies the device but captures cell/settings frames raw instead of decoding them", async () => {
+    const transport = scenario({ deviceInfoFrames: [b4a24sDeviceInfo()], streamIntervalMs: undefined });
+    const session = new BmsSession({ transport });
+    await session.connect({ id: "b4a24s", name: "JK-B4A24S" });
+    await vi.advanceTimersByTimeAsync(10);
+
+    const snap = session.snapshot;
+    expect(snap.deviceInfo?.vendorId).toBe("JK-B4A24S");
+    expect(snap.profile?.mode).toBe("diagnostic");
+    expect(snap.profile?.profile?.id).toBe("jk-b4a24s");
+    expect(snap.connection).toBe("STREAMING");
+    expect(snap.cellInfo).toBeUndefined();
+    expect(snap.settings).toBeUndefined();
+    expect(Object.keys(snap.capturedFrames).sort()).toEqual(["CELL_INFO", "DEVICE_INFO", "SETTINGS"]);
+    await expect(session.settingsWriter().setBalancerEnabled(true)).rejects.toThrow(/disabled/);
+
+    const report = buildDebugExport({
+      environment: { appVersion: "test", platform: "test" },
+      snapshot: snap,
+      events: session.events,
+    });
+    const captured = report.capturedFrames as Record<string, { hex: string }>;
+    expect(captured.CELL_INFO.hex.startsWith("55 AA EB 90 02")).toBe(true);
+    expect(captured.DEVICE_INFO.hex).toContain("**");
+    session.dispose();
   });
 });

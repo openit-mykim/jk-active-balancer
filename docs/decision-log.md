@@ -194,3 +194,35 @@ keeps the web/package CI install unchanged, while giving design section 35
 Migration impact: none for `packages/*` or `apps/web`. Release signing is not
 configured; the APK CI produces is signed with the template debug key and is
 not for distribution.
+
+## D014 - Default target device is JK-B4A24S; protocol confirmed by capture first
+
+Old decision (D001): the only target is JK-B2A16S / hardware 3.0 / JK04.
+
+New decision: the owner's device, **JK-B4A24S**, is the default target the apps
+present (`DEFAULT_TARGET_PROFILE`). The JK-B2A16S JK04 profile stays as is.
+
+Evidence and limits:
+- Upstream `syssi/esphome-jk-bms` (3.0.0 and `main`, checked 2026-11-16) and
+  its issue tracker have no JK-B4A24S report. Relatives differ: JK-B5A24S
+  hw 8.x -> JK04, JK-B2A24S hw 10.x -> JK02_24S, hw 11.x -> JK02_32S.
+- Seller specification (owner-provided image, 2026-11-16): 8S-24S, 4 A active
+  balancing, Bluetooth only (no RS485 / CAN / NTC), same product line as
+  JK-B2A8S / JK-B2A16S. This makes JK04 likely but is not protocol evidence
+  (design section 43).
+
+Therefore `JK_B4A24S_PROFILE` has `protocol: "UNKNOWN"`, `maxCells: 24` and no
+decode or write capability. The device is identified through the shared 0x03
+device-info frame, and every other frame is captured raw (latest frame per type
+kept in `SessionSnapshot.capturedFrames` and always included, passcode masked,
+in the debug export). `cellLayoutHint()` reports whether a captured cell-info
+frame reads plausibly as JK04 (float32 V) or JK02 (uint16 mV); it is a hint for
+a person and never enables decoding.
+
+Also fixed (pre-existing, from D012): `BmsSession` decoded cell-info / settings
+frames with the JK04 layout even in diagnostic mode. Decoding now requires a
+`verified` profile.
+
+Next: capture from the physical JK-B4A24S, add `*.captured.hex` fixtures,
+compare against the official app, then set the profile's protocol, revisions
+and capabilities in a new decision.

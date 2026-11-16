@@ -93,6 +93,14 @@ export function buildDebugExport(input: DebugExportInput): Record<string, unknow
     },
     bleConnectionEvents: input.events,
     parserErrors: snapshot.parserErrors,
+    // Latest raw frame per type; the device passcode is masked. Always
+    // included so a diagnostic-mode capture needs no extra switch.
+    capturedFrames: Object.fromEntries(
+      Object.entries(snapshot.capturedFrames).map(([type, frame]) => [
+        type,
+        { ...frame, at: new Date(frame.at).toISOString(), hex: maskFrameHex(frame.hex) },
+      ]),
+    ),
   };
   if (input.includeRawFrames) {
     report.rawFrames = (input.packetLog ?? [])

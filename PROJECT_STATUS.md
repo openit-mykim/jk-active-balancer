@@ -4,7 +4,9 @@ Last updated: 2026-11-16
 
 ## Current phase
 
-**Phase 1 software complete - NOT HARDWARE VERIFIED.**
+**Phase 1 software complete - NOT HARDWARE VERIFIED. Default target is now the
+owner's JK-B4A24S (D014), whose BLE protocol is not confirmed yet: the apps
+identify it and capture raw frames only.**
 
 Every design section 35 "Must" item is implemented in software and tested
 against upstream-documented frames, the web PWA builds, and the Android release
@@ -52,6 +54,11 @@ Hardware validation status: **NOT HARDWARE VERIFIED**.
 
 ## Immediate next action
 
+0. JK-B4A24S (default target, D014): connect with the APK (Android) or the web
+   app (Chrome on Android / desktop), wait until the "Protocol capture" panel
+   lists CELL_INFO and SETTINGS, share/export the capture JSON. From it: add
+   `fixtures/jk-b4a24s/*.captured.hex`, confirm the protocol against the
+   official app, then enable a decoder for the profile in a new decision.
 1. Connect a physical JK-B2A16S (web on Chrome/Android, and the APK); capture
    device-info / settings / cell-info frames with the raw logger and add them
    as `*.captured.hex` fixtures with provenance (design section 37 step 9).
@@ -84,6 +91,7 @@ Should:
 
 ## Product decisions already made
 
+- Default target device: JK-B4A24S, capture-first (D014); JK-B2A16S remains the verified-by-upstream JK04 profile.
 - Primary transport: BLE (Web Bluetooth on Chrome, react-native-ble-plx on mobile).
 - Local-first; no account or cloud.
 - JK-B2A16S / JK04 only in Phase 1.
