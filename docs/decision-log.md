@@ -102,3 +102,44 @@ register-write API is exposed.
 
 Reason: design sections 15, 34.6, 34.7. A writable register requires a verified
 address, unit, range and read-back verification first.
+
+## D010 - Cell-info statistics follow upstream (computed, not offsets 202/206)
+
+Old decision: `decodeCellInfo()` returned the frame's own floats at offsets 202
+(average) and 206 (delta).
+
+New decision: average and delta are computed from the populated cells, exactly
+as upstream `decode_jk04_cell_info_()` publishes them; the upstream code keeps
+the 202/206 publishes commented out. The raw floats stay available as
+`reportedAverageCellVoltage` / `reportedDeltaCellVoltage` for diagnostics. The
+pack voltage is exposed as `totalVoltage` (sum of all 24 slots, upstream
+`total_voltage`).
+
+Evidence: `syssi/esphome-jk-bms@b3016df` `components/jk_bms_ble/jk_bms_ble.cpp`
+lines 815-831. On the upstream fixture the computed average is 3.352661 V vs the
+reported 3.352845 V; delta is identical.
+
+Migration impact: `averageCellVoltage` shifts by < 0.2 mV on the fixture.
+Frame-type checks (`isCellInfoFrame`, `isDeviceInfoFrame`, `isSettingsFrame`)
+now require a full 300-byte frame; previously a 5-byte prefix passed and the
+decoder threw a `RangeError` reading past the end (pre-existing defect).
+
+## D011 - Settings read enabled; write whitelist = JK04 balancer switch, gated
+
+Old decision (D009): `decodeSettings()` threw; the writer rejected every call.
+
+New decision:
+- `decodeSettings()` decodes the six fields upstream `decode_jk04_settings_()`
+  names (cell count 34, power-off voltage 38, start balance voltage 98, trigger
+  delta 106, max balance current 110, balancer switch 114) and is verified on
+  the upstream example frame. NOT HARDWARE VERIFIED.
+- Write whitelist: only the balancer switch, register `0x6C`, length 1 (upstream
+  `SWITCHES[CONF_BALANCER]` JK04 column). Upstream lists `0x00` (unsupported)
+  for every JK04 number register, so balance start / delta voltage writes reject
+  with `SettingsWriteUnsupportedError` permanently for JK04.
+- `createSettingsWriter({ profile, send, readSettings })` writes only when the
+  profile grants `settingsWrite && balancerSwitch`, and confirms by read-back.
+  `JK_B2A16S_PROFILE` keeps both `false` until a physical read-back test passes.
+  Unknown hardware revisions never get a writer (diagnostic mode).
+
+Reason: design sections 15, 35 (settings read is a Must), 36 (write -> readback).

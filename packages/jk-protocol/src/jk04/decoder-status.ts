@@ -1,4 +1,4 @@
-import { FRAME_TYPE_CELL_INFO, RESPONSE_HEADER } from "./constants";
+import { FRAME_TYPE_CELL_INFO, RESPONSE_FRAME_SIZE, RESPONSE_HEADER } from "./constants";
 
 /** One cell as reported by a JK04 cell-info frame. */
 export interface JkCellSample {
@@ -22,9 +22,22 @@ export interface JkCellInfo {
   readonly maxCellVoltage: number;
   readonly minCellIndex: number;
   readonly maxCellIndex: number;
+  /** `max - min` over populated cells (upstream computes this; see below). */
   readonly deltaCellVoltage: number;
+  /** Mean over populated cells (upstream computes this; see below). */
   readonly averageCellVoltage: number;
+  /** Pack voltage: sum of every cell voltage (upstream `total_voltage`). */
+  readonly totalVoltage: number;
+  /**
+   * Raw float32 at offset 202. Upstream documents it as "Average Cell Voltage"
+   * but does not publish it, so it is kept for diagnostics only.
+   */
+  readonly reportedAverageCellVoltage: number;
+  /** Raw float32 at offset 206 ("Delta Cell Voltage"), diagnostics only. */
+  readonly reportedDeltaCellVoltage: number;
   readonly balancer: BalancerActivity;
+  /** Raw balancer byte at offset 220 (upstream `balancer_status_bitmask`). */
+  readonly balancerStatusByte: number;
   /** Balancing current in amps (float32 at offset 222). */
   readonly balancingCurrent: number;
   /** Device uptime in seconds (uint32 at offset 286). */
@@ -36,8 +49,8 @@ export interface JkCellInfo {
  * `syssi/esphome-jk-bms` (tag 3.0.0):
  *   cell voltage i (0-based) = float32 LE at i*4 + 6      (24 slots)
  *   cell resistance i        = float32 LE at i*4 + 102    (24 slots)
- *   average cell voltage     = float32 LE at 202
- *   delta cell voltage       = float32 LE at 206
+ *   average cell voltage     = float32 LE at 202  (diagnostic; upstream does not publish)
+ *   delta cell voltage       = float32 LE at 206  (diagnostic; upstream does not publish)
  *   balancer blink byte      = uint8 at 220
  *   balancing current        = float32 LE at 222
  *   uptime                   = uint32 LE at 286
@@ -78,7 +91,7 @@ function readBalancerByte(frame: Uint8Array, offset: number): BalancerActivity {
 /** True when `frame` is a complete JK04 cell-info frame (header + type 0x02). */
 export function isCellInfoFrame(frame: Uint8Array): boolean {
   return (
-    frame.length >= 5 &&
+    frame.length >= RESPONSE_FRAME_SIZE &&
     frame[0] === RESPONSE_HEADER[0] &&
     frame[1] === RESPONSE_HEADER[1] &&
     frame[2] === RESPONSE_HEADER[2] &&
@@ -88,9 +101,12 @@ export function isCellInfoFrame(frame: Uint8Array): boolean {
 }
 
 /**
- * Decode a JK04 cell-info frame. Statistics follow upstream: only cells with
- * a non-zero voltage count towards the average, and the minimum is taken over
- * non-zero cells only.
+ * Decode a JK04 cell-info frame. Statistics follow upstream
+ * `decode_jk04_cell_info_()`: only cells with a non-zero voltage count towards
+ * the average and the minimum, delta is `max - min`, and the pack voltage is the
+ * sum of all cell slots. Upstream deliberately leaves the frame's own
+ * average/delta floats (offsets 202/206) unpublished; they are exposed here as
+ * `reported*` diagnostics only.
  *
  * @throws Error when the frame is not a cell-info frame.
  */
@@ -106,11 +122,13 @@ export function decodeCellInfo(frame: Uint8Array): JkCellInfo {
   let minCellIndex = 0;
   let maxCellIndex = 0;
   let voltageSum = 0;
+  let totalVoltage = 0;
 
   for (let i = 0; i < CELL_SLOTS; i += 1) {
     const voltage = readFloat32LE(frame, i * 4 + CELL_VOLTAGE_BASE);
     const resistance = readFloat32LE(frame, i * 4 + CELL_RESISTANCE_BASE);
     cells.push({ index: i + 1, voltage, resistance });
+    totalVoltage += voltage;
 
     if (voltage > 0) {
       activeCells += 1;
@@ -128,16 +146,23 @@ export function decodeCellInfo(frame: Uint8Array): JkCellInfo {
 
   const averageCellVoltage = activeCells > 0 ? voltageSum / activeCells : 0;
 
+  const min = activeCells > 0 ? minCellVoltage : 0;
+  const max = activeCells > 0 ? maxCellVoltage : 0;
+
   return {
     cells,
     activeCells,
-    minCellVoltage: activeCells > 0 ? minCellVoltage : 0,
-    maxCellVoltage: activeCells > 0 ? maxCellVoltage : 0,
-    minCellIndex,
-    maxCellIndex,
-    deltaCellVoltage: readFloat32LE(frame, DELTA_OFFSET),
-    averageCellVoltage: readFloat32LE(frame, AVERAGE_OFFSET) !== 0 ? readFloat32LE(frame, AVERAGE_OFFSET) : averageCellVoltage,
+    minCellVoltage: min,
+    maxCellVoltage: max,
+    minCellIndex: activeCells > 0 ? minCellIndex : 0,
+    maxCellIndex: activeCells > 0 ? maxCellIndex : 0,
+    deltaCellVoltage: max - min,
+    averageCellVoltage,
+    totalVoltage,
+    reportedAverageCellVoltage: readFloat32LE(frame, AVERAGE_OFFSET),
+    reportedDeltaCellVoltage: readFloat32LE(frame, DELTA_OFFSET),
     balancer: readBalancerByte(frame, BALANCER_OFFSET),
+    balancerStatusByte: frame[BALANCER_OFFSET],
     balancingCurrent: readFloat32LE(frame, BALANCING_CURRENT_OFFSET),
     uptimeSeconds: readUint32LE(frame, UPTIME_OFFSET),
   };

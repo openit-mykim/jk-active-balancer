@@ -13,8 +13,13 @@ describe("decodeCellInfo", () => {
     expect(info.activeCells).toBe(16);
     expect(info.cells[0]?.voltage).toBeCloseTo(3.349716, 5);
     expect(info.cells[1]?.voltage).toBeCloseTo(3.354133, 5);
-    expect(info.averageCellVoltage).toBeCloseTo(3.352845, 5);
+    // Upstream computes average/delta from the cells and does not publish the
+    // frame's own floats at 202/206; those are kept as reported* diagnostics.
+    expect(info.averageCellVoltage).toBeCloseTo(3.352661, 5);
     expect(info.deltaCellVoltage).toBeCloseTo(0.004417, 5);
+    expect(info.reportedAverageCellVoltage).toBeCloseTo(3.352845, 5);
+    expect(info.reportedDeltaCellVoltage).toBeCloseTo(0.004417, 5);
+    expect(info.totalVoltage).toBeCloseTo(53.642575, 4);
     expect(info.balancer).toBe("idle");
     expect(info.balancingCurrent).toBe(0);
     expect(info.uptimeSeconds).toBe(1873491);
@@ -40,6 +45,11 @@ describe("decodeCellInfo", () => {
   it("recognises a cell-info frame by header and type", () => {
     expect(isCellInfoFrame(BALANCED)).toBe(true);
     expect(isCellInfoFrame(DEVICE_INFO)).toBe(false);
+  });
+
+  it("rejects a truncated frame instead of reading past its end", () => {
+    expect(isCellInfoFrame(BALANCED.slice(0, 100))).toBe(false);
+    expect(() => decodeCellInfo(BALANCED.slice(0, 100))).toThrow(/cell-info/);
   });
 
   it("throws on a device-info frame", () => {
