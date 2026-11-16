@@ -159,3 +159,38 @@ Reason: before this, the state machine, reconnect policy and pipeline existed
 but nothing wired them together, the Web adapter could not detect a dropped
 link, and the React Native adapter could not connect at all (its device factory
 always threw).
+
+## D013 - apps/mobile is a standalone React Native 0.87.1 npm project
+
+Old decision (D005): `apps/mobile` was a skeleton (no native project) and not a
+workspace member; its native dependencies would arrive "with the native build
+phase".
+
+New decision: this is that phase. `apps/mobile` now holds the React Native
+0.87.1 Android and iOS projects (from `@react-native-community/template@0.87.1`,
+renamed to `com.jkactivebalancer` / `jkActiveBalancer`) and is installed with
+**npm** (`apps/mobile/package-lock.json`), still outside the pnpm workspace.
+The shared packages are consumed as TypeScript source through Metro
+`extraNodeModules` and tsconfig `paths`, so `workspace:*` is no longer used
+there. All versions are exact (D002).
+
+- `react` is pinned to `19.2.3` in the mobile app (not the web app's `19.3.0`):
+  React Native's bundled renderer refuses a different React version at runtime.
+  The previous skeleton pinned `19.3.0` (pre-existing defect, never exercised
+  because nothing was installed).
+- Android 12+ uses `BLUETOOTH_SCAN` (`neverForLocation`) + `BLUETOOTH_CONNECT`;
+  Android <= 11 uses legacy Bluetooth + fine location, `maxSdkVersion=30`.
+- iOS: `NSBluetoothAlwaysUsageDescription` and `bluetooth-central` background
+  mode (design section 22).
+- Demo mode replays `src/fixtures.generated.ts`, generated from `fixtures/`
+  by `npm run gen:fixtures`; a root vitest test fails on drift.
+- CI gains `android-build` (ubuntu, JDK 21, `assembleRelease`) and `ios-build`
+  (macOS, `pod install`, unsigned simulator build) (design section 31).
+
+Reason: keeps pnpm's symlinked layout away from React Native autolinking and
+keeps the web/package CI install unchanged, while giving design section 35
+"Android build" / "iOS build" a real project.
+
+Migration impact: none for `packages/*` or `apps/web`. Release signing is not
+configured; the APK CI produces is signed with the template debug key and is
+not for distribution.

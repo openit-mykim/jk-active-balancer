@@ -89,3 +89,56 @@ jobs:
           path: apps/web/dist
           if-no-files-found: error
           retention-days: 14
+
+  # Design section 31. apps/mobile is a standalone npm project (D005, D013).
+  android-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build release APK (signed with the template debug key; not for distribution)
+        run: cd android && ./gradlew assembleRelease --no-daemon
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  ios-build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: ios-pod-install
+        run: cd ios && pod install
+      - name: ios-build (simulator, unsigned)
+        run: >
+          xcodebuild -workspace ios/jkActiveBalancer.xcworkspace -scheme jkActiveBalancer
+          -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build

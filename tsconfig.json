@@ -17,6 +17,8 @@
     "packages/*/tests/**/*.ts",
     "apps/web/src/**/*.ts",
     "apps/web/src/**/*.tsx",
-    "apps/web/vite.config.ts"
+    "apps/web/vite.config.ts",
+    "apps/mobile/src/**/*.test.ts",
+    "apps/mobile/src/fixtures.generated.ts"
   ]
 }

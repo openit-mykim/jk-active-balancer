@@ -5,3 +5,14 @@ coverage/
 .DS_Store
 *.log
 .vite/
+
+# React Native (apps/mobile)
+apps/mobile/android/.gradle/
+apps/mobile/android/build/
+apps/mobile/android/app/build/
+apps/mobile/android/app/.cxx/
+apps/mobile/android/local.properties
+apps/mobile/ios/Pods/
+apps/mobile/ios/build/
+apps/mobile/ios/*.xcworkspace/xcuserdata/
+apps/mobile/.bundle/
