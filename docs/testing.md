@@ -23,13 +23,39 @@ bash scripts/verify.sh   # all of the above, in order
 - `decoder-device-info.test.ts` - real upstream JK-B2A16S device-info frame
 - `decoder-status.test.ts` - real upstream cell-info frame + a synthetic
   unbalanced frame
-- `profile.test.ts` - JK-B2A16S profile selection and capability flags
-- `settings-write.test.ts` - the Phase 1 read-only guarantee
+- `decoder-settings.test.ts` - settings frame against the upstream example
+- `profile.test.ts` - profile selection, HW-revision resolution / diagnostic mode, hex helpers
+- `settings-write.test.ts` - balancer-switch command bytes, capability gating,
+  read-back verification, unsupported JK04 registers, no raw write API
 
-`packages/device-model`, `packages/ble-core`, `packages/ui-common`,
-`packages/ble-web`, `packages/ble-react-native` add domain statistics, reconnect
-policy, connection state machine, packet pipeline (driven by `MockBleTransport`)
-and cell-grid layout tests.
+`packages/ble-core/tests`:
+
+- `session.test.ts` - `BmsSession` end to end on `MockBleTransport` with fake
+  timers: lifecycle order, diagnostic mode, corrupt frames keep state,
+  STALE/stalled watchdog, link-loss reconnect, 1/2/4 s backoff, manual
+  reconnect, user disconnect, identify timeout, 0x96 retry, settings read,
+  raw logger on/off
+- `debug-export.test.ts` - file name, contents, passcode masking, no RX export
+- `watchdog-replay.test.ts` - freshness thresholds, fragmented fixture replay
+- `packet-pipeline.test.ts`, `connection-manager.test.ts`, `reconnect-policy.test.ts`
+
+Adapters: `packages/ble-web/tests/adapter.test.ts` (fake GATT: filters,
+namePrefix fallback, copied notifications, link loss vs user disconnect,
+reconnect) and `packages/ble-react-native/tests/adapter.test.ts` (fake
+BleManager: connect, notifications, disconnect events, scan errors, base64).
+
+`packages/device-model`, `packages/ui-common`: statistics, active-cell-count
+priority, history/CSV, cell grid layout and colour thresholds.
+
+`apps/mobile/src/fixtures.generated.test.ts` keeps the mobile demo fixtures in
+sync with `fixtures/`.
+
+Mobile (not part of `pnpm test`):
+
+```bash
+cd apps/mobile && npm ci && npm run typecheck
+cd android && ./gradlew assembleRelease
+```
 
 ## Fixture policy
 

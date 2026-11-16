@@ -1,79 +1,92 @@
 # Project Status
 
-Last updated: 2026-10-02
+Last updated: 2026-11-16
 
 ## Current phase
 
-**Phase 1 scaffold complete - JK04 read-only codec implemented and tested; no
-hardware validation yet.**
+**Phase 1 software complete - NOT HARDWARE VERIFIED.**
+
+Every design section 35 "Must" item is implemented in software and tested
+against upstream-documented frames, the web PWA builds, and the Android release
+APK builds and runs (demo mode) on a physical phone. No physical JK-B2A16S has
+been connected yet, so the section 36 acceptance criteria are still open.
 
 Phase 1 target is fixed: `JK-B2A16S` / hardware `3.0` / software `3.3.0` /
 protocol `JK04` / read-only + diagnostics (design sections 0, 35, 44).
 
 ## What exists
 
-- pnpm workspace monorepo with the design section 5 layout.
-- `@jk-active-balancer/jk-protocol`: JK04 constants, `sum8` CRC, 20-byte command
-  builder, `FrameAssembler`, device-info and cell-info decoders, JK-B2A16S
-  profile, Phase 2 settings-write interface.
-- `@jk-active-balancer/device-model`, `ble-core` (transport interface, state
-  machine, reconnect policy, packet pipeline, `MockBleTransport`), `ble-web`,
-  `ble-react-native`, `ui-common`.
-- `apps/web`: Vite + React + TypeScript PWA that builds.
-- `apps/mobile`: React Native skeleton (structure, `package.json`, `tsconfig`).
-- Fixtures for device-info / settings / status / malformed, with provenance.
-- Docs: protocol design, decision log, dependency pins, architecture, testing,
-  upstream lock.
-- CI: lint, typecheck, unit-test, web-build on `main` and feature branches.
+- `jk-protocol`: JK04 constants, `sum8`, command builder, `FrameAssembler`,
+  device-info / cell-info / **settings** decoders, revision-aware
+  `resolveProfile()` (unknown HW -> read-only diagnostic mode), JK04 write
+  whitelist (balancer switch `0x6C`) with read-back, gated off (D010, D011).
+- `ble-core`: `BmsSession` (lifecycle, identify, 0x96 retry, watchdog,
+  reconnect backoff, manual reconnect), `RawPacketLogger`, `buildDebugExport()`,
+  fixture replay, `MockBleTransport` (D012).
+- `ble-web`: Web Bluetooth adapter with link-loss detection, reconnect,
+  namePrefix dev fallback.
+- `ble-react-native`: react-native-ble-plx adapter (connect, monitor,
+  disconnect events, scan errors).
+- `device-model`: statistics, active-cell-count priority (41.2), history + CSV.
+- `ui-common`: 8 cells/column grid (1..24S), configurable colour thresholds.
+- `apps/web`: live dashboard (connection, device/profile, pack stats, cell grid,
+  cell detail, history + CSV, read-only settings, raw log, debug export,
+  fixture-replay demo).
+- `apps/mobile`: React Native 0.87.1 Android + iOS projects, same features,
+  BLE permissions, foreground re-check, Bluetooth ON reconnect (D013).
+- CI: lint, typecheck, unit-test, web-build, android-build, ios-build.
 
-## Verified evidence
+## Verified evidence (2026-11-16)
 
-- `pnpm test` passes locally (see the run output recorded in the PR/commit
-  message for this scaffold).
-- `pnpm --filter web build` succeeds locally.
-- CI is green on `main`.
+- `bash scripts/verify.sh`: pins, lint, typecheck, 115 unit tests, web build pass.
+- Web dashboard driven in headless Chrome with the demo transport: STREAMING,
+  values match fixtures, disconnect -> IDLE, no page errors.
+- `apps/mobile`: `npm run typecheck` passes; `./gradlew assembleRelease
+  -PreactNativeArchitectures=arm64-v8a` succeeds; the APK installed on an
+  LG-F800S (Android 9) reaches STREAMING in demo mode and renders device,
+  pack and 16S grid.
+- Not run: iOS build (needs macOS; CI job added, not yet observed green), real
+  BLE scan/connect on a phone, any JK-B2A16S hardware.
 
-Hardware validation status: **NOT HARDWARE VERIFIED**. No fixture was captured
-from a physical JK-B2A16S.
+Hardware validation status: **NOT HARDWARE VERIFIED**.
 
 ## Immediate next action
 
-1. Capture real JK-B2A16S JK04 frames with a physical device (design section 37
-   step 9) and add them as `*.captured.hex` fixtures with a provenance entry.
-2. Implement the settings **read** path (frame type 0x01) against the real
-   capture; keep the decoder throwing until it is verified.
-3. Wire the Web Bluetooth adapter to the dashboard and verify against hardware.
-4. Add the Android / iOS build jobs (design section 31) once `apps/mobile` joins
-   the workspace install.
+1. Connect a physical JK-B2A16S (web on Chrome/Android, and the APK); capture
+   device-info / settings / cell-info frames with the raw logger and add them
+   as `*.captured.hex` fixtures with provenance (design section 37 step 9).
+2. Run the section 36 acceptance checks: identification, cell values vs the
+   official app, 30-minute stability, Bluetooth OFF -> ON reconnect, corrupt
+   frame handling.
+3. Observe the `android-build` and `ios-build` CI jobs green.
+4. Only after a physical read-back test: enable `balancerSwitch` /
+   `settingsWrite` in the profile and add a balancer ON/OFF control.
 
-## Phase checklist
+## Phase checklist (design section 35)
 
-- [x] Repository created: `openit-mykim/jk-active-balancer`
-- [x] MIT license selected
-- [x] Agent execution contract added
-- [x] Upstream pinned (tag 3.0.0 / commit b3016df)
-- [x] pnpm workspace scaffold (design section 5)
-- [x] JK04 constants + CRC + command builder
-- [x] Frame assembler with split/duplicate/out-of-order/malformed handling
-- [x] Device-info decoder against the real upstream frame
-- [x] Cell-info (status) decoder against the real upstream frame
-- [x] Device profile + capability model
-- [x] BLE transport interface + mock transport + packet pipeline
-- [x] Web Bluetooth and react-native-ble-plx adapters (skeleton)
-- [x] Cell grid layout (8 cells/column, up to 3 columns)
-- [x] CI: lint / typecheck / unit-test / web-build
-- [x] Dependency pin check (no ^ / ~)
-- [ ] Physical JK-B2A16S capture and fixtures
-- [ ] Settings read path verified
-- [ ] Android build / iOS build jobs
-- [ ] Web dashboard wired to a real connection
+Must:
+
+- [x] Scan / Connect / Disconnect / Auto reconnect (software; NOT HARDWARE VERIFIED)
+- [x] Device info, JK04 auto detection, unknown-revision diagnostic mode
+- [x] Cell 1..16 voltage, min, max, delta, balancer status, balancer current
+- [x] Settings read (upstream example frame)
+- [x] Raw packet logger, debug export, fixture replay
+- [x] Chrome PWA build
+- [x] Android build (local release APK; CI job added)
+- [ ] iOS build (project + CI job added; not built - no macOS here)
+- [ ] Physical JK-B2A16S capture and section 36 acceptance
+
+Should:
+
+- [ ] Balancer ON/OFF write (encoder + read-back done, disabled until hardware test)
+- [x] Balance start / delta voltage write - **not possible over JK04** (no upstream register; D011)
+- [x] History chart, CSV export (web)
 
 ## Product decisions already made
 
-- Primary transport: BLE (Web Bluetooth on Chrome, react-native-ble-plx on
-  mobile).
+- Primary transport: BLE (Web Bluetooth on Chrome, react-native-ble-plx on mobile).
 - Local-first; no account or cloud.
 - JK-B2A16S / JK04 only in Phase 1.
-- Read-only in Phase 1; settings write is Phase 2, whitelist-only.
+- Settings write whitelist-only and disabled until hardware read-back.
 - Dependency versions are exact; upstream is pinned by tag and commit.
-- `apps/mobile` is not yet a workspace member (decision D005).
+- `apps/mobile` is a standalone npm project outside the pnpm workspace (D013).

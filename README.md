@@ -26,9 +26,11 @@ cell 1..16 voltages, min/max/delta/average, balancer status and current,
 settings read, raw packet logger, fixture replay, and the Android / iOS / PWA
 builds.
 
-Out of scope for Phase 1: **settings write** and any other JK model. Settings
-write is Phase 2 and whitelist-only (design section 15); the interface exists
-(`JkSettingsWriter`) but every method rejects.
+Out of scope for Phase 1: any other JK model, and **enabled** settings write.
+The write path exists for the one register upstream defines for JK04 (balancer
+switch `0x6C`), with read-back verification, but stays disabled by the device
+profile until it is verified on hardware (design section 15, decision D011).
+Balance start / delta voltage have no JK04 write register upstream.
 
 ## Monorepo layout
 
@@ -36,22 +38,24 @@ write is Phase 2 and whitelist-only (design section 15); the interface exists
 jk-active-balancer/
 ├─ apps/
 │  ├─ web/                    Vite + React + TS, Web Bluetooth PWA
-│  └─ mobile/                 React Native skeleton
+│  └─ mobile/                 React Native 0.87.1 app (Android + iOS), npm project
 ├─ packages/
 │  ├─ jk-protocol/            JK04 constants, CRC, frames, decoders, profile
-│  ├─ ble-core/               BleTransport, state machine, reconnect, pipeline, mock
+│  ├─ ble-core/               BleTransport, BmsSession, watchdog, logger, debug export, mock
 │  ├─ ble-web/                Web Bluetooth adapter
-│  ├─ ble-react-native/       react-native-ble-plx adapter (structural)
-│  ├─ device-model/           battery / cell / balancer domain model
-│  └─ ui-common/              cell-grid layout helpers
+│  ├─ ble-react-native/       react-native-ble-plx adapter
+│  ├─ device-model/           domain model, statistics, history / CSV
+│  └─ ui-common/              cell-grid layout, colour thresholds
 ├─ fixtures/jk-b2a16s/        device-info / settings / status / malformed
 ├─ scripts/                   verify.sh, check-pins.mjs
 ├─ docs/                      protocol design, decision log, upstream lock
-└─ .github/workflows/ci.yml   lint, typecheck, unit-test, web-build
+└─ .github/workflows/ci.yml   lint, typecheck, unit-test, web-build, android-build, ios-build
 ```
 
-`apps/mobile` is scaffolded but is not a pnpm workspace member yet, so the
-Phase 1 install stays small and deterministic (`docs/decision-log.md` D005).
+`apps/mobile` is a standalone npm project outside the pnpm workspace, so the
+package/web install stays small and deterministic; it consumes `packages/*` as
+TypeScript source through Metro (`docs/decision-log.md` D005, D013). See
+`apps/mobile/README.md`.
 
 ## Development
 
@@ -86,15 +90,16 @@ license**, so no code from it may be reused.
 
 ## Current state
 
-Early Phase 1 scaffold. The JK04 codec, the fragment assembler, the device-info
-and cell-info decoders and the domain/transport layers are implemented and
-covered by tests against real upstream frames. Hardware capture and the native
-builds are tracked in `PROJECT_STATUS.md`.
+Phase 1 software is implemented: JK04 codec, settings / device-info / cell-info
+decoders, connection session with reconnect and watchdog, raw logger, debug
+export, fixture replay, the Web Bluetooth dashboard and the React Native app.
+Everything is tested against upstream-documented frames; **nothing has been
+verified on a physical JK-B2A16S yet**. See `PROJECT_STATUS.md`.
 
 ## Safety
 
-Settings write can affect battery safety. Phase 1 therefore never writes to the
-device. Any future write path must be capability-gated, whitelisted, staged,
+Settings write can affect battery safety. The shipped profile therefore never
+writes to the device. Any future write path must be capability-gated, whitelisted, staged,
 validated and read back; a successful BLE write alone is not evidence that a
 setting is correct.
 
