@@ -2,6 +2,7 @@ import { type ReactElement, useEffect, useMemo, useState } from "react";
 import { WebBluetoothAdapter } from "@jk-active-balancer/ble-web";
 import { TABS, connectionStatusKey, tabLabel, type Screen, type Tab } from "@jk-active-balancer/ui-common";
 import { Icon } from "./icons";
+import { version as APP_VERSION } from "../package.json";
 import { makeT, usePrefs } from "./prefs";
 import { Balance } from "./screens/Balance";
 import { Control } from "./screens/Control";
@@ -19,7 +20,7 @@ import { type TransportMode, useNow, useSessionHandle, useSnapshot } from "./use
  */
 export function App(): ReactElement {
   const webBluetooth = useMemo(() => WebBluetoothAdapter.isSupported(), []);
-  const [prefs, setPrefs] = usePrefs();
+  const [prefs, setPrefs, prefsReset] = usePrefs();
   const { t, language } = makeT(prefs);
   const [mode, setMode] = useState<TransportMode>(webBluetooth ? "web-bluetooth" : "demo");
   const [screen, setScreen] = useState<Screen>("overview");
@@ -68,6 +69,8 @@ export function App(): ReactElement {
     openDevices: () => setScreen("devices"),
     startMode,
     webBluetooth,
+    appVersion: APP_VERSION,
+    prefsReset,
   };
   const status = t(connectionStatusKey(snapshot.connection, snapshot.freshness));
   const onDevices = screen === "devices";

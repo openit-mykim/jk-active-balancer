@@ -72,6 +72,12 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Single source of the app version (wiki mobile standard 0 / 7): package.json.
+// versionCode = major * 10000 + minor * 100 + patch.
+def appPackageJson = new groovy.json.JsonSlurper().parse(file("../../package.json"))
+def appVersionName = appPackageJson.version
+def appVersionCode = appVersionName.tokenize('.').collect { it.replaceAll(/\D.*/, '').toInteger() }.with { it[0] * 10000 + it[1] * 100 + it[2] }
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -82,8 +88,8 @@ android {
         applicationId "com.jkactivebalancer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
     }
     signingConfigs {
         debug {

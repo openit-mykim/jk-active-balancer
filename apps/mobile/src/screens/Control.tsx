@@ -1,20 +1,21 @@
 import { type ReactElement, useState } from "react";
-import { Share, Text, View } from "react-native";
+import { Share, View } from "react-native";
 import { buildDebugExport } from "@jk-active-balancer/ble-core";
 import { cellLayoutHint, parseHex } from "@jk-active-balancer/jk-protocol";
-import { Button, Card, EmptyState, LockIcon, Row, Toggle, fmt, s } from "../ui";
+import { SPACE, freshnessLabel } from "@jk-active-balancer/ui-common";
+import { Button, Card, EmptyState, LockIcon, Row, Toggle, Txt, fmt, st } from "../ui";
 import type { ScreenProps } from "./context";
 
 /** 제어: locked maintenance workspace (jbd-bms-manager Control). */
 export function Control(p: ScreenProps): ReactElement {
-  const { snapshot: snap, t, handle } = p;
+  const { snapshot: snap, t, handle, language } = p;
   const [unlocked, setUnlocked] = useState(false);
   const [includeRaw, setIncludeRaw] = useState(false);
   const [busy, setBusy] = useState(false);
 
   if (!unlocked) {
     return (
-      <EmptyState glyph={<LockIcon />} title={t("maintenanceTitle")} body={t("maintenanceBody")}>
+      <EmptyState illustration={<LockIcon />} title={t("maintenanceTitle")} body={t("maintenanceBody")}>
         <Button variant="filled" label={t("unlock")} onPress={() => setUnlocked(true)} />
       </EmptyState>
     );
@@ -22,7 +23,7 @@ export function Control(p: ScreenProps): ReactElement {
 
   const share = (raw: boolean): void => {
     const report = buildDebugExport({
-      environment: { appVersion: "0.1.0", platform: `mobile/${handle.mode}` },
+      environment: { appVersion: p.appVersion, platform: `mobile/${handle.mode}` },
       snapshot: snap,
       events: handle.session.events,
       packetLog: handle.logger.entries,
@@ -33,21 +34,29 @@ export function Control(p: ScreenProps): ReactElement {
   const frames = Object.entries(snap.capturedFrames);
   const cell = snap.capturedFrames.CELL_INFO;
   const hint = cell ? cellLayoutHint(parseHex(cell.hex)) : null;
-  const st = snap.settings;
+  const settings = snap.settings;
+  const setLogger = (v: boolean): void => {
+    handle.logger.enabled = v;
+    p.setPrefs({ loggerEnabled: v });
+  };
 
   return (
-    <View style={s.screen}>
+    <View style={st.screen}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <LockIcon size={18} open />
-          <Text style={s.muted}>{t("maintenanceTitle")}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: SPACE.sm }}>
+          <LockIcon size={SPACE.lg} open />
+          <Txt role="label" color="onSurfaceMuted">
+            {t("maintenanceTitle")}
+          </Txt>
         </View>
         <Button variant="text" label={t("lock")} onPress={() => setUnlocked(false)} />
       </View>
 
       {snap.profile?.mode === "diagnostic" && (
         <Card title={t("protocolCapture")}>
-          <Text style={s.muted}>{t("captureBody")}</Text>
+          <Txt role="label" color="onSurfaceMuted">
+            {t("captureBody")}
+          </Txt>
           {frames.map(([type, f]) => (
             <Row key={type} label={type} value={String(f.count)} />
           ))}
@@ -57,22 +66,26 @@ export function Control(p: ScreenProps): ReactElement {
       )}
 
       <Card title={t("balancerSettings")}>
-        {st ? (
+        {settings ? (
           <>
-            <Row label={t("balancerSwitch")} value={st.balancerEnabled ? t("enabled") : t("disabled")} />
-            <Row label={t("cellCount")} value={`${st.cellCount}S`} />
-            <Row label={t("startVoltage")} value={`${fmt(st.balanceStartVoltage)} V`} />
-            <Row label={t("triggerDelta")} value={`${fmt(st.balanceTriggerDeltaVoltage)} V`} />
-            <Row label={t("maxBalanceCurrent")} value={`${fmt(st.maxBalanceCurrent, 1)} A`} />
-            <Row label={t("powerOffVoltage")} value={`${fmt(st.powerOffVoltage)} V`} />
+            <Row label={t("balancerSwitch")} value={settings.balancerEnabled ? t("enabled") : t("disabled")} />
+            <Row label={t("cellCount")} value={`${settings.cellCount}S`} />
+            <Row label={t("startVoltage")} value={`${fmt(settings.balanceStartVoltage)} V`} />
+            <Row label={t("triggerDelta")} value={`${fmt(settings.balanceTriggerDeltaVoltage)} V`} />
+            <Row label={t("maxBalanceCurrent")} value={`${fmt(settings.maxBalanceCurrent, 1)} A`} />
+            <Row label={t("powerOffVoltage")} value={`${fmt(settings.powerOffVoltage)} V`} />
           </>
         ) : (
-          <Text style={s.muted}>{snap.profile?.mode === "diagnostic" ? t("settingsNotDecoded") : t("noDataBody")}</Text>
+          <Txt role="label" color="onSurfaceMuted">
+            {snap.profile?.mode === "diagnostic" ? t("settingsNotDecoded") : t("noDataBody")}
+          </Txt>
         )}
-        <Text style={s.mutedSmall}>{t("writeDisabled")}</Text>
+        <Txt role="caption" color="onSurfaceMuted">
+          {t("writeDisabled")}
+        </Txt>
         <Button
           label={t("readSettings")}
-          disabled={busy || !st || !["READY", "STREAMING"].includes(snap.connection)}
+          disabled={busy || !settings || !["READY", "STREAMING"].includes(snap.connection)}
           onPress={() => {
             setBusy(true);
             void handle.session
@@ -84,34 +97,28 @@ export function Control(p: ScreenProps): ReactElement {
       </Card>
 
       <Card title={t("diagnostics")}>
-        <Row label={t("frames")} value={`${snap.framesReceived} · ${snap.freshness}`} />
+        <Row label={t("frames")} value={`${snap.framesReceived} · ${freshnessLabel(language, snap.freshness)}`} />
         <Row label={t("parserErrors")} value={String(snap.parserErrors.length)} />
-        <View style={s.inlineToggle}>
-          <Text style={s.text}>{t("rawLogger")}</Text>
-          <Toggle
-            value={p.prefs.loggerEnabled}
-            onChange={(v) => {
-              handle.logger.enabled = v;
-              p.setPrefs({ loggerEnabled: v });
-            }}
-          />
+        <View style={st.inlineToggle}>
+          <Txt>{t("rawLogger")}</Txt>
+          <Toggle label={t("rawLogger")} value={p.prefs.loggerEnabled} onChange={setLogger} />
         </View>
-        <View style={s.inlineToggle}>
-          <Text style={s.text}>{t("includeRaw")}</Text>
-          <Toggle value={includeRaw} onChange={setIncludeRaw} />
+        <View style={st.inlineToggle}>
+          <Txt>{t("includeRaw")}</Txt>
+          <Toggle label={t("includeRaw")} value={includeRaw} onChange={setIncludeRaw} />
         </View>
-        <View style={s.btnRow}>
+        <View style={st.btnRow}>
           <Button label={t("exportDebug")} onPress={() => share(includeRaw)} />
           <Button variant="text" label={t("clearLog")} onPress={() => handle.logger.clear()} />
         </View>
         {p.prefs.loggerEnabled && (
-          <Text style={{ color: "#9fb3cf", fontFamily: "monospace", fontSize: 10 }}>
+          <Txt role="micro" mono color="logText">
             {handle.logger.entries
               .slice(-30)
               .reverse()
               .map((e) => `${e.timestamp.slice(11, 23)} ${e.direction}${e.frame ? ` ${e.frame}` : ""} ${e.hex.slice(0, 47)}`)
               .join("\n") || "—"}
-          </Text>
+          </Txt>
         )}
       </Card>
     </View>

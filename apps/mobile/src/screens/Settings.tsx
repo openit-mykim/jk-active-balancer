@@ -1,74 +1,99 @@
 import type { ReactElement } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
-import { THEME, type LanguagePreference } from "@jk-active-balancer/ui-common";
-import { GLYPH, GroupTitle, ListItem, Toggle, s } from "../ui";
+import { Pressable, TextInput, View } from "react-native";
+import { MAX_FONT_SCALE_FIXED, SIZE, SPACE, THEME, TYPE, type LanguagePreference } from "@jk-active-balancer/ui-common";
+import { GroupTitle, ListItem, Toggle, Txt } from "../ui";
 import type { ScreenProps } from "./context";
 
-const LANGS: ReadonlyArray<{ value: LanguagePreference; label: string }> = [
-  { value: "system", label: "Auto" },
-  { value: "ko", label: "한국어" },
-  { value: "en", label: "English" },
-];
-
-/** 설정: the app itself (jbd-bms-manager Settings). */
-export function Settings(p: ScreenProps): ReactElement {
+/** 설정: the app itself (jbd-bms-manager Settings). Values persist (AsyncStorage). */
+export function Settings(p: ScreenProps & { prefsReset: boolean }): ReactElement {
   const { t, prefs, setPrefs } = p;
   const th = prefs.thresholds;
-  const input = (value: number, onChange: (mv: number) => void): ReactElement => (
+  const langs: ReadonlyArray<{ value: LanguagePreference; label: string }> = [
+    { value: "system", label: t("langAuto") },
+    { value: "ko", label: "한국어" },
+    { value: "en", label: "English" },
+  ];
+  const input = (label: string, value: number, onChange: (mv: number) => void): ReactElement => (
     <TextInput
+      accessibilityLabel={label}
       keyboardType="number-pad"
       defaultValue={String(Math.round(value * 1000))}
       onEndEditing={(e) => {
         const n = Number(e.nativeEvent.text);
         if (Number.isFinite(n) && n > 0) onChange(n);
       }}
-      style={{ color: THEME.onSurface, backgroundColor: THEME.surfaceVariant, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, minWidth: 48, textAlign: "center" }}
+      maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED}
+      style={{
+        color: THEME.onSurface,
+        backgroundColor: THEME.surfaceVariant,
+        borderRadius: SIZE.radius,
+        minHeight: SIZE.touchMin,
+        minWidth: SIZE.buttonPrimary + SPACE.sm,
+        paddingHorizontal: SPACE.sm,
+        fontSize: TYPE.body.size,
+        textAlign: "center",
+      }}
     />
   );
   return (
     <View>
+      {p.prefsReset && (
+        <Txt role="label" color="onWarningContainer" style={{ padding: SPACE.lg }}>
+          {t("prefsReset")}
+        </Txt>
+      )}
       <GroupTitle>{t("groupInterface")}</GroupTitle>
       <ListItem
-        glyph={GLYPH.globe}
+        glyph="globe"
         title={t("language")}
         body={prefs.language === "system" ? t("langSystem") : prefs.language === "ko" ? "한국어" : "English"}
-        trailing={
-          <View style={{ flexDirection: "row", gap: 4 }}>
-            {LANGS.map((l) => (
-              <Pressable
-                key={l.value}
-                onPress={() => setPrefs({ language: l.value })}
-                style={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: prefs.language === l.value ? THEME.primary : THEME.outline,
-                }}
-              >
-                <Text style={[s.mutedSmall, prefs.language === l.value && { color: THEME.primary }]}>{l.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        }
       />
+      <View style={{ flexDirection: "row", gap: SPACE.sm, paddingHorizontal: SPACE.lg, paddingBottom: SPACE.md }} accessibilityRole="radiogroup">
+        {langs.map((l) => {
+          const on = prefs.language === l.value;
+          return (
+            <Pressable
+              key={l.value}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={l.label}
+              onPress={() => setPrefs({ language: l.value })}
+              style={{
+                flex: 1,
+                minHeight: SIZE.touchMin,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: SIZE.radius,
+                borderWidth: 1,
+                borderColor: on ? THEME.primary : THEME.outline,
+                backgroundColor: on ? THEME.primaryContainer : undefined,
+              }}
+            >
+              <Txt role="label" fixed color={on ? "primary" : "onSurfaceMuted"}>
+                {l.label}
+              </Txt>
+            </Pressable>
+          );
+        })}
+      </View>
       <ListItem
-        glyph={GLYPH.palette}
+        glyph="palette"
         title={t("cellThresholds")}
         body={`${t("caution")} / ${t("danger")} (mV)`}
         trailing={
-          <View style={{ flexDirection: "row", gap: 6 }}>
-            {input(th.warnDeviation, (mv) => setPrefs({ thresholds: { ...th, warnDeviation: mv / 1000 } }))}
-            {input(th.alertDeviation, (mv) => setPrefs({ thresholds: { ...th, alertDeviation: mv / 1000 } }))}
+          <View style={{ flexDirection: "row", gap: SPACE.sm }}>
+            {input(t("caution"), th.warnDeviation, (mv) => setPrefs({ thresholds: { ...th, warnDeviation: mv / 1000 } }))}
+            {input(t("danger"), th.alertDeviation, (mv) => setPrefs({ thresholds: { ...th, alertDeviation: mv / 1000 } }))}
           </View>
         }
       />
       <GroupTitle>{t("groupDeveloper")}</GroupTitle>
       <ListItem
-        glyph={GLYPH.code}
+        glyph="code"
         title={t("rawLogger")}
         trailing={
           <Toggle
+            label={t("rawLogger")}
             value={prefs.loggerEnabled}
             onChange={(v) => {
               p.handle.logger.enabled = v;
@@ -78,7 +103,8 @@ export function Settings(p: ScreenProps): ReactElement {
         }
       />
       <GroupTitle>{t("groupOther")}</GroupTitle>
-      <ListItem glyph={GLYPH.info} title={t("appInfo")} body={`v0.1.0 · ${t("appInfoBody")} · MIT`} />
+      <ListItem glyph="shield" title={t("privacyTitle")} body={t("privacyBody")} />
+      <ListItem glyph="info" title={t("appInfo")} body={`${t("version")} ${p.appVersion} · ${t("appInfoBody")} · MIT`} />
     </View>
   );
 }

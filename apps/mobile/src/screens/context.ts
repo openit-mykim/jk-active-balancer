@@ -1,13 +1,8 @@
 import type { SessionSnapshot } from "@jk-active-balancer/ble-core";
-import type { CellColorThresholds, Language, LanguagePreference, StringKey } from "@jk-active-balancer/ui-common";
+import type { AppPrefs, Language, StringKey } from "@jk-active-balancer/ui-common";
 import type { Mode, SessionHandle } from "../session";
 
-export interface Prefs {
-  readonly language: LanguagePreference;
-  readonly thresholds: CellColorThresholds;
-  readonly loggerEnabled: boolean;
-}
-
+export type Prefs = AppPrefs;
 export type T = (key: StringKey, params?: Record<string, string | number>) => string;
 
 export interface ScreenProps {
@@ -20,6 +15,7 @@ export interface ScreenProps {
   readonly setPrefs: (patch: Partial<Prefs>) => void;
   readonly openDevices: () => void;
   readonly startMode: (mode: Mode) => void;
+  readonly appVersion: string;
 }
 
 export function hasDevice(s: SessionSnapshot): boolean {

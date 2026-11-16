@@ -1,16 +1,16 @@
 import type { ReactElement } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { checkCellRange } from "@jk-active-balancer/device-model";
-import { THEME } from "@jk-active-balancer/ui-common";
-import { Button, Card, EmptyState, GLYPH, Metric, MetricGrid, fmt, s } from "../ui";
+import { SIZE, SPACE, THEME, cellRangeMessage, stateLabel } from "@jk-active-balancer/ui-common";
+import { Badge, Button, Card, EmptyState, Illustration, Metric, MetricGrid, Txt, fmt, st } from "../ui";
 import { type ScreenProps, hasDevice, modeLabel } from "./context";
 
 /** 개요 (jbd-bms-manager Overview). */
 export function Overview(p: ScreenProps): ReactElement {
-  const { snapshot: snap, t } = p;
+  const { snapshot: snap, t, language } = p;
   if (!hasDevice(snap)) {
     return (
-      <EmptyState glyph={GLYPH.bluetooth} title={t("placeholderTitle")} body={t("placeholderBody")}>
+      <EmptyState illustration={<Illustration name="bluetooth" />} title={t("placeholderTitle")} body={t("placeholderBody")}>
         <Button variant="filled" label={t("selectDevice")} onPress={p.openDevices} />
       </EmptyState>
     );
@@ -22,14 +22,14 @@ export function Overview(p: ScreenProps): ReactElement {
   const mode = snap.profile?.mode;
 
   return (
-    <View style={s.screen}>
+    <View style={st.screen}>
       {snap.connection === "RECONNECT_WAIT" && (
-        <View style={{ backgroundColor: "#3b2a12", borderColor: THEME.band.caution, borderWidth: 1, borderRadius: 12, padding: 12, gap: 6 }}>
-          <Text style={[s.text, { fontWeight: "700" }]}>{t("reconnectBannerTitle")}</Text>
-          <Text style={{ color: "#ffcc80", fontSize: 13 }}>
+        <View style={st.banner} accessibilityRole="alert">
+          <Txt bold>{t("reconnectBannerTitle")}</Txt>
+          <Txt role="label" color="onWarningContainer">
             {t("reconnectIn", { s: Math.max(0, Math.ceil(((snap.nextReconnectAt ?? p.now) - p.now) / 1000)), n: snap.reconnectAttempt })}
-          </Text>
-          <View style={s.btnRow}>
+          </Txt>
+          <View style={st.btnRow}>
             <Button variant="text" label={t("cancelReconnect")} onPress={() => void p.handle.session.disconnect()} />
             <Button variant="tonal" label={t("reconnectNow")} onPress={() => void p.handle.session.reconnectNow()} />
           </View>
@@ -37,25 +37,33 @@ export function Overview(p: ScreenProps): ReactElement {
       )}
 
       <Card>
-        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-          <Text style={[s.text, { fontSize: 18, fontWeight: "600" }]}>{snap.deviceInfo?.vendorId ?? snap.device?.name ?? "-"}</Text>
-          {mode && (
-            <Text style={[s.chip, { backgroundColor: mode === "verified" ? THEME.band.normal : THEME.band.caution }]}>{modeLabel(t, mode)}</Text>
-          )}
-          {stale && <Text style={[s.chip, { backgroundColor: THEME.band.caution }]}>{t("stale")}</Text>}
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: SPACE.sm }}>
+          <Txt role="heading" bold>
+            {snap.deviceInfo?.vendorId ?? snap.device?.name ?? "-"}
+          </Txt>
+          {mode && <Badge band={mode === "verified" ? "normal" : "caution"}>{modeLabel(t, mode)}</Badge>}
+          {stale && <Badge band="caution">{t("stale")}</Badge>}
         </View>
-        <Text style={s.muted}>
-          {snap.connection}
+        <Txt role="caption" color="onSurfaceMuted">
+          {stateLabel(language, snap.connection)}
           {spec ? ` · ${spec.minCells}-${spec.maxCells}S · ${t("ratedCurrent", { a: spec.ratedBalanceCurrent })}` : ""}
-        </Text>
-        {mode === "preview" && <Text style={{ color: "#ffb74d", fontSize: 12 }}>{t("syntheticNote")}</Text>}
+        </Txt>
+        {mode === "preview" && (
+          <Txt role="caption" color="onWarningContainer">
+            {t("syntheticNote")}
+          </Txt>
+        )}
       </Card>
 
       {info ? (
         <>
           <Card dim={stale}>
-            <Text style={s.muted}>{t("packVoltage")}</Text>
-            <Text style={s.primaryMetric}>{fmt(info.totalVoltage, 2)} V</Text>
+            <Txt role="caption" color="onSurfaceMuted">
+              {t("packVoltage")}
+            </Txt>
+            <Txt role="display" tabular>
+              {fmt(info.totalVoltage, 2)} V
+            </Txt>
             <MetricGrid>
               <Metric label={t("averageVoltage")} value={`${fmt(info.averageCellVoltage)} V`} />
               <Metric label={t("deltaVoltage")} value={`${(info.deltaCellVoltage * 1000).toFixed(1)} mV`} />
@@ -66,11 +74,7 @@ export function Overview(p: ScreenProps): ReactElement {
           <Card dim={stale}>
             <MetricGrid>
               <Metric label={t("balancer")} value={snap.settings ? (snap.settings.balancerEnabled ? t("enabled") : t("disabled")) : "-"} />
-              <Metric
-                label={t("balancing")}
-                value={info.balancer === "idle" ? t("idle") : t("active")}
-                band={info.balancer === "idle" ? undefined : "caution"}
-              />
+              <Metric label={t("balancing")} value={info.balancer === "idle" ? t("idle") : t("active")} band={info.balancer === "idle" ? undefined : "caution"} />
               <Metric
                 label={t("balanceCurrent")}
                 value={`${fmt(info.balancingCurrent, 2)} A`}
@@ -79,27 +83,38 @@ export function Overview(p: ScreenProps): ReactElement {
               <Metric label={t("cellCount")} value={`${snap.settings?.cellCount ?? info.activeCells}S`} />
             </MetricGrid>
             {spec && (
-              <View style={{ height: 6, backgroundColor: THEME.surfaceVariant, borderRadius: 3, overflow: "hidden", marginTop: 6 }}>
+              <View style={{ height: SPACE.sm, backgroundColor: THEME.surfaceVariant, borderRadius: SPACE.xs, overflow: "hidden" }} importantForAccessibility="no">
                 <View
                   style={{
-                    height: 6,
+                    height: SPACE.sm,
                     width: `${Math.min(100, (Math.abs(info.balancingCurrent) / spec.ratedBalanceCurrent) * 100)}%`,
                     backgroundColor: THEME.primary,
                   }}
                 />
               </View>
             )}
-            {!range.ok && <Text style={s.error}>{range.message}</Text>}
-            {spec?.interfaces.ntc && <Text style={s.mutedSmall}>{t("ntcNote")}</Text>}
+            {!range.ok && (
+              <Txt role="label" color="error">
+                {cellRangeMessage(language, range)}
+              </Txt>
+            )}
+            {spec?.interfaces.ntc && (
+              <Txt role="caption" color="onSurfaceMuted">
+                {t("ntcNote")}
+              </Txt>
+            )}
           </Card>
         </>
       ) : (
         mode === "diagnostic" && (
           <Card>
-            <Text style={s.muted}>{t("captureOnlyBody")}</Text>
+            <Txt role="label" color="onSurfaceMuted">
+              {t("captureOnlyBody")}
+            </Txt>
           </Card>
         )
       )}
+      <View style={{ height: SIZE.badge }} />
     </View>
   );
 }

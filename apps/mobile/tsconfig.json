@@ -22,7 +22,8 @@
     },
     "types": [
       "react-native"
-    ]
+    ],
+    "resolveJsonModule": true
   },
   "include": [
     "src/**/*.ts",

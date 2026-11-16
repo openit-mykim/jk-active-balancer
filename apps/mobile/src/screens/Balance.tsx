@@ -1,8 +1,8 @@
 import { type ReactElement, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { resolveActiveCellCount } from "@jk-active-balancer/device-model";
-import { THEME, cellBand, classifyCellVoltage, computeCellGridLayout } from "@jk-active-balancer/ui-common";
-import { BarChart, Card, EmptyState, GLYPH, Metric, MetricGrid, Row, Toggle, fmt, s } from "../ui";
+import { SPACE, SIZE, THEME, cellBand, classifyCellVoltage, computeCellGridLayout } from "@jk-active-balancer/ui-common";
+import { BarChart, Card, EmptyState, Illustration, Metric, MetricGrid, Row, Toggle, Txt, fmt, st } from "../ui";
 import type { ScreenProps } from "./context";
 
 /** 밸런스 (jbd-bms-manager Balance). */
@@ -14,7 +14,7 @@ export function Balance(p: ScreenProps): ReactElement {
   if (!info) {
     return (
       <EmptyState
-        glyph={GLYPH.balance}
+        illustration={<Illustration name="balance" />}
         title={t("tab_balance")}
         body={snap.profile?.mode === "diagnostic" ? t("captureOnlyBody") : t("emptyCells")}
       />
@@ -28,17 +28,19 @@ export function Balance(p: ScreenProps): ReactElement {
   });
   const grid = computeCellGridLayout(activeCells);
   const stale = snap.freshness === "stale" || snap.freshness === "stalled";
+  const band = (index: number) => cellBand(classifyCellVoltage(info.cells[index - 1]?.voltage ?? 0, info.averageCellVoltage, p.prefs.thresholds));
   const counts = { normal: 0, caution: 0, danger: 0 };
-  const band = (index: number) => {
-    const b = cellBand(classifyCellVoltage(info.cells[index - 1]?.voltage ?? 0, info.averageCellVoltage, p.prefs.thresholds));
-    return b;
-  };
   grid.placements.forEach((pl) => (counts[band(pl.index)] += 1));
   const columns = Array.from({ length: grid.columns }, (_v, c) => grid.placements.filter((pl) => pl.column === c));
   const compact = grid.columns === 3;
+  const legend: Array<["normal" | "caution" | "danger", string]> = [
+    ["normal", t("bandNormal")],
+    ["caution", t("bandCaution")],
+    ["danger", t("bandDanger")],
+  ];
 
   return (
-    <View style={s.screen}>
+    <View style={st.screen}>
       <Card dim={stale}>
         <MetricGrid>
           <Metric label={t("minVoltage")} value={`${fmt(info.minCellVoltage)} V`} sub={`#${info.minCellIndex}`} />
@@ -50,57 +52,72 @@ export function Balance(p: ScreenProps): ReactElement {
             band={counts.danger > 0 ? "danger" : counts.caution > 0 ? "caution" : "normal"}
           />
         </MetricGrid>
-        <Text style={s.muted}>
-          <Text style={{ color: THEME.band.normal }}>● </Text>
-          {t("bandNormal")} {counts.normal}   <Text style={{ color: THEME.band.caution }}>● </Text>
-          {t("bandCaution")} {counts.caution}   <Text style={{ color: THEME.band.danger }}>● </Text>
-          {t("bandDanger")} {counts.danger}
-          {info.balancer !== "idle" ? `   · ${t("balancing")}` : ""}
-        </Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: SPACE.md, alignItems: "center" }}>
+          {legend.map(([b, label]) => (
+            <View key={b} style={{ flexDirection: "row", alignItems: "center", gap: SPACE.xs }}>
+              <View style={{ width: SPACE.md, height: SPACE.md, borderRadius: SPACE.sm, backgroundColor: THEME.band[b] }} />
+              <Txt role="caption" color="onSurfaceMuted">
+                {label} {counts[b]}
+              </Txt>
+            </View>
+          ))}
+          {info.balancer !== "idle" && (
+            <Txt role="caption" color="onWarningContainer">
+              {t("balancing")}
+            </Txt>
+          )}
+        </View>
       </Card>
 
-      <Card
-        dim={stale}
-        title={`${t("cellVoltages")} · ${spec ? t("ofRange", { n: activeCells, min: spec.minCells, max: spec.maxCells }) : `${activeCells}S`}`}
-      >
+      <Card dim={stale} title={`${t("cellVoltages")} · ${spec ? t("ofRange", { n: activeCells, min: spec.minCells, max: spec.maxCells }) : `${activeCells}S`}`}>
         {snap.profile?.profile?.capabilities.cellWireResistance && (
-          <View style={s.inlineToggle}>
-            <Text style={s.muted}>{t("showWireResistance")}</Text>
-            <Toggle value={showResistance} onChange={setShowResistance} />
+          <View style={st.inlineToggle}>
+            <Txt role="label" color="onSurfaceMuted">
+              {t("showWireResistance")}
+            </Txt>
+            <Toggle label={t("showWireResistance")} value={showResistance} onChange={setShowResistance} />
           </View>
         )}
-        <View style={{ flexDirection: "row", gap: 6 }}>
+        <View style={{ flexDirection: "row", gap: SPACE.sm }}>
           {columns.map((column, c) => (
-            <View key={c} style={{ flex: 1, gap: 5 }}>
+            <View key={c} style={{ flex: 1, gap: SPACE.xs }}>
               {column.map((pl) => {
                 const cell = info.cells[pl.index - 1];
+                const v = cell?.voltage ?? 0;
                 const flag = pl.index === info.maxCellIndex ? " ▲" : pl.index === info.minCellIndex ? " ▼" : "";
+                const b = band(pl.index);
                 return (
                   <Pressable
                     key={pl.index}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t("cellN", { n: pl.index })} ${v.toFixed(3)} V, ${t(b === "normal" ? "bandNormal" : b === "caution" ? "bandCaution" : "bandDanger")}`}
                     onPress={() => setSelected(selected === pl.index ? null : pl.index)}
                     style={{
+                      minHeight: SIZE.touchMin,
                       backgroundColor: THEME.surfaceVariant,
-                      borderLeftWidth: 4,
-                      borderLeftColor: THEME.band[band(pl.index)],
-                      borderRadius: 6,
-                      paddingVertical: 6,
-                      paddingHorizontal: 7,
+                      borderLeftWidth: SPACE.xs,
+                      borderLeftColor: THEME.band[b],
+                      borderRadius: SIZE.radius,
+                      paddingVertical: SPACE.xs,
+                      paddingHorizontal: SPACE.sm,
                       flexDirection: compact ? "column" : "row",
-                      justifyContent: "space-between",
+                      justifyContent: compact ? "center" : "space-between",
+                      alignItems: compact ? "flex-start" : "center",
                       borderWidth: selected === pl.index ? 1 : 0,
                       borderColor: THEME.primary,
                     }}
                   >
-                    <Text style={[s.muted, compact && { fontSize: 11 }]}>
+                    <Txt role="caption" color="onSurfaceMuted" fixed>
                       {String(pl.index).padStart(2, "0")}
-                      <Text style={{ color: THEME.primary }}>{flag}</Text>
-                    </Text>
-                    <Text style={[s.text, { fontVariant: ["tabular-nums"] }, compact && { fontSize: 13 }]}>
-                      {(cell?.voltage ?? 0).toFixed(3)}
-                    </Text>
+                      {flag}
+                    </Txt>
+                    <Txt role={compact ? "label" : "body"} tabular fixed>
+                      {v.toFixed(3)}
+                    </Txt>
                     {showResistance && cell ? (
-                      <Text style={s.mutedSmall}>{(cell.resistance * 1000).toFixed(0)}mΩ</Text>
+                      <Txt role="micro" color="onSurfaceMuted" fixed>
+                        {(cell.resistance * 1000).toFixed(0)}mΩ
+                      </Txt>
                     ) : null}
                   </Pressable>
                 );
@@ -111,15 +128,14 @@ export function Balance(p: ScreenProps): ReactElement {
       </Card>
 
       {selected !== null && (
-        <Card title={`Cell ${String(selected).padStart(2, "0")}`}>
+        <Card title={t("cellN", { n: String(selected).padStart(2, "0") })}>
           <Row label={t("cellVoltages")} value={`${(info.cells[selected - 1]?.voltage ?? 0).toFixed(4)} V`} />
           <Row label={t("deltaVoltage")} value={`${(((info.cells[selected - 1]?.voltage ?? 0) - info.averageCellVoltage) * 1000).toFixed(1)} mV`} />
           <Row label={t("wireResistance")} value={`${((info.cells[selected - 1]?.resistance ?? 0) * 1000).toFixed(1)} mΩ`} />
           {p.handle.history.items.length > 1 && (
             <BarChart
-              values={p.handle.history
-                .series(info.cells.slice(0, selected).filter((c) => c.voltage > 0).length)
-                .map((pt) => pt.voltage)}
+              label={t("historyTitle")}
+              values={p.handle.history.series(info.cells.slice(0, selected).filter((c) => c.voltage > 0).length).map((pt) => pt.voltage)}
             />
           )}
         </Card>

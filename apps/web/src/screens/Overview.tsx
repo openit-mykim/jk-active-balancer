@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { checkCellRange } from "@jk-active-balancer/device-model";
+import { cellRangeMessage, stateLabel } from "@jk-active-balancer/ui-common";
 import { Icon } from "../icons";
 import { Card, EmptyState, Metric, fmt } from "../ui";
 import { type ScreenProps, hasDevice } from "./context";
@@ -54,7 +55,7 @@ export function Overview(p: ScreenProps): ReactElement {
           {stale && <span className="chip chip-caution">{t("stale")}{age !== undefined ? ` ${age}s` : ""}</span>}
         </div>
         <div className="status-sub">
-          {s.connection}
+          {stateLabel(p.language, s.connection)}
           {spec ? ` · ${spec.minCells}-${spec.maxCells}S · ${t("ratedCurrent", { a: spec.ratedBalanceCurrent })}` : ""}
         </div>
         {s.profile?.mode === "preview" && <div className="status-sub warn-text">{t("syntheticNote")}</div>}
@@ -80,7 +81,7 @@ export function Overview(p: ScreenProps): ReactElement {
               />
               <Metric
                 label={t("balancing")}
-                value={info.balancer === "idle" ? t("idle") : `${t("active")} (${info.balancer})`}
+                value={info.balancer === "idle" ? t("idle") : t("active")}
                 band={info.balancer === "idle" ? undefined : "caution"}
               />
               <Metric
@@ -95,7 +96,7 @@ export function Overview(p: ScreenProps): ReactElement {
                 <div style={{ width: `${Math.min(100, (Math.abs(info.balancingCurrent) / spec.ratedBalanceCurrent) * 100)}%` }} />
               </div>
             )}
-            {!range.ok && <p className="error-text">{range.message}</p>}
+            {!range.ok && <p className="error-text">{cellRangeMessage(p.language, range)}</p>}
             {spec?.interfaces.ntc && <p className="muted small">{t("ntcNote")}</p>}
           </Card>
         </>

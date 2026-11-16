@@ -14,6 +14,7 @@ export function Settings(p: ScreenProps): ReactElement {
   };
   return (
     <div className="screen list-screen">
+      {p.prefsReset && <p className="warn-text pad">{t("prefsReset")}</p>}
       <div className="group-title">{t("groupInterface")}</div>
       <ListItem
         icon={<Icon name="globe" />}
@@ -25,7 +26,7 @@ export function Settings(p: ScreenProps): ReactElement {
             aria-label={t("language")}
             onChange={(e) => setPrefs({ language: e.target.value as LanguagePreference })}
           >
-            <option value="system">{t("langSystem")}</option>
+            <option value="system">{t("langAuto")}</option>
             <option value="ko">한국어</option>
             <option value="en">English</option>
           </select>
@@ -77,7 +78,8 @@ export function Settings(p: ScreenProps): ReactElement {
       />
 
       <div className="group-title">{t("groupOther")}</div>
-      <ListItem icon={<Icon name="info" />} title={t("appInfo")} body={`v0.1.0 · ${t("appInfoBody")} · MIT`} />
+      <ListItem icon={<Icon name="lock" />} title={t("privacyTitle")} body={t("privacyBody")} />
+      <ListItem icon={<Icon name="info" />} title={t("appInfo")} body={`${t("version")} ${p.appVersion} · ${t("appInfoBody")} · MIT`} />
     </div>
   );
 }

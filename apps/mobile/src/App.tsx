@@ -1,42 +1,65 @@
-import { type ReactElement, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { AppState, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
+import { type ReactElement, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { AppState, Pressable, ScrollView, StatusBar, StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import type { BleDevice } from "@jk-active-balancer/ble-core";
 import {
-  DEFAULT_CELL_COLOR_THRESHOLDS,
+  DEFAULT_PREFS,
+  SIZE,
+  SPACE,
   TABS,
   THEME,
   connectionStatusKey,
   resolveLanguage,
   tabLabel,
   translate,
+  type AppPrefs,
   type Screen,
 } from "@jk-active-balancer/ui-common";
+import { version as APP_VERSION } from "../package.json";
 import { ensureBlePermissions, onBluetoothStateChange } from "./ble/ble-manager";
+import { loadPrefs, savePrefs } from "./prefs-store";
 import { Balance } from "./screens/Balance";
 import { Control } from "./screens/Control";
-import type { Prefs, ScreenProps } from "./screens/context";
+import type { ScreenProps } from "./screens/context";
 import { Detail } from "./screens/Detail";
 import { Devices } from "./screens/Devices";
 import { Overview } from "./screens/Overview";
 import { Settings } from "./screens/Settings";
 import { type Mode, createSession } from "./session";
-import { GLYPH } from "./ui";
+import { Glyph, Txt } from "./ui";
 
 const SYSTEM_LOCALE = Intl.DateTimeFormat().resolvedOptions().locale;
 
-/**
- * App shell following jbd-bms-manager: top app bar (device list button,
- * title, connection status), five bottom-navigation destinations and a
- * full-screen device picker.
- */
+/** Waits for stored preferences so the first frame is already in the chosen language. */
 export function App(): ReactElement {
-  const [prefs, setPrefsState] = useState<Prefs>({
-    language: "system",
-    thresholds: DEFAULT_CELL_COLOR_THRESHOLDS,
-    loggerEnabled: __DEV__,
-  });
-  const setPrefs = (patch: Partial<Prefs>): void => setPrefsState((p) => ({ ...p, ...patch }));
+  const [loaded, setLoaded] = useState<{ prefs: AppPrefs; reset: boolean } | null>(null);
+  useEffect(() => {
+    void loadPrefs().then(({ prefs, status }) => setLoaded({ prefs, reset: status === "discarded" }));
+  }, []);
+  return (
+    <SafeAreaProvider>
+      <StatusBar barStyle="dark-content" />
+      {loaded ? <Shell initialPrefs={loaded.prefs} prefsReset={loaded.reset} /> : <View style={styles.splash} />}
+    </SafeAreaProvider>
+  );
+}
+
+/**
+ * App shell following jbd-bms-manager: app bar (device list button, title,
+ * connection status), five bottom-navigation destinations, device screen.
+ * Component sizes follow the wiki mobile standard 5.7.7.
+ */
+function Shell({ initialPrefs, prefsReset }: { initialPrefs: AppPrefs; prefsReset: boolean }): ReactElement {
+  const [prefs, setPrefsState] = useState<AppPrefs>(initialPrefs);
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    savePrefs(prefs);
+  }, [prefs]);
+  const setPrefs = (patch: Partial<AppPrefs>): void => setPrefsState((p) => ({ ...p, ...patch }));
   const language = resolveLanguage(prefs.language, SYSTEM_LOCALE);
   const t: ScreenProps["t"] = (key, params) => translate(language, key, params);
 
@@ -51,6 +74,7 @@ export function App(): ReactElement {
   const [scanning, setScanning] = useState(false);
   const [found, setFound] = useState<readonly BleDevice[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -80,10 +104,12 @@ export function App(): ReactElement {
   const runScan = async (): Promise<void> => {
     setError(null);
     setFound([]);
+    // 5.8: ask when the user starts a scan; on denial show the alternative, do not loop.
     if (!(await ensureBlePermissions())) {
-      setError("Bluetooth permission denied.");
+      setPermissionDenied(true);
       return;
     }
+    setPermissionDenied(false);
     setScanning(true);
     try {
       const devices = await handle.session.scan();
@@ -96,7 +122,6 @@ export function App(): ReactElement {
     }
   };
 
-  // Act once the session for the newly chosen mode exists.
   useEffect(() => {
     if (pending === "none") return;
     const action = pending;
@@ -148,70 +173,76 @@ export function App(): ReactElement {
     setPrefs,
     openDevices: () => setScreen("devices"),
     startMode,
+    appVersion: APP_VERSION,
   };
   const onDevices = screen === "devices";
   const status = t(connectionStatusKey(snapshot.connection, snapshot.freshness));
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" />
-      <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
-        <View style={styles.appBar}>
-          <Pressable
-            hitSlop={8}
-            accessibilityLabel={onDevices ? t("back") : t("selectDevice")}
-            onPress={() => setScreen(onDevices ? "overview" : "devices")}
-            style={styles.appBarButton}
-          >
-            <Text style={styles.appBarGlyph}>{onDevices ? GLYPH.back : GLYPH.menu}</Text>
-          </Pressable>
-          <Text style={styles.appBarTitle} numberOfLines={1}>
-            {onDevices ? t("devices") : tabLabel(language, screen)}
-          </Text>
-          <Text style={styles.appBarStatus} numberOfLines={1}>
-            {snapshot.deviceInfo?.vendorId && snapshot.connection !== "IDLE" ? `${snapshot.deviceInfo.vendorId} · ` : ""}
-            {status}
-          </Text>
-        </View>
+    <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
+      <View style={styles.appBar}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={onDevices ? t("back") : t("selectDevice")}
+          onPress={() => setScreen(onDevices ? "overview" : "devices")}
+          style={styles.appBarButton}
+        >
+          <Glyph name={onDevices ? "back" : "menu"} color="onAppBar" />
+        </Pressable>
+        <Txt role="heading" bold color="onAppBar" lines={1} style={styles.appBarTitle} fixed>
+          {onDevices ? t("devices") : tabLabel(language, screen)}
+        </Txt>
+        <Txt role="label" bold color="onAppBar" lines={1} style={styles.appBarStatus} fixed>
+          {snapshot.deviceInfo?.vendorId && snapshot.connection !== "IDLE" ? `${snapshot.deviceInfo.vendorId} · ` : ""}
+          {status}
+        </Txt>
+      </View>
 
-        <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 16 }}>
-          {screen === "overview" && <Overview {...props} />}
-          {screen === "detail" && <Detail {...props} />}
-          {screen === "balance" && <Balance {...props} />}
-          {screen === "control" && <Control {...props} />}
-          {screen === "settings" && <Settings {...props} />}
-          {screen === "devices" && <Devices {...props} scanning={scanning} found={found} error={error} scan={scan} connect={connect} />}
-        </ScrollView>
-
-        {!onDevices && (
-          <SafeAreaView edges={["bottom"]} style={styles.bottomNav}>
-            {TABS.map((tab) => {
-              const active = screen === tab;
-              return (
-                <Pressable key={tab} style={styles.navItem} onPress={() => setScreen(tab)} accessibilityRole="tab" accessibilityState={{ selected: active }}>
-                  <Text style={[styles.navGlyph, active && styles.navActive]}>{GLYPH[tab]}</Text>
-                  <Text style={[styles.navLabel, active && styles.navActive]}>{tabLabel(language, tab)}</Text>
-                </Pressable>
-              );
-            })}
-          </SafeAreaView>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: SPACE.lg }}>
+        {screen === "overview" && <Overview {...props} />}
+        {screen === "detail" && <Detail {...props} />}
+        {screen === "balance" && <Balance {...props} />}
+        {screen === "control" && <Control {...props} />}
+        {screen === "settings" && <Settings {...props} prefsReset={prefsReset} />}
+        {screen === "devices" && (
+          <Devices {...props} scanning={scanning} found={found} error={error} permissionDenied={permissionDenied} scan={scan} connect={connect} />
         )}
-      </SafeAreaView>
-    </SafeAreaProvider>
+      </ScrollView>
+
+      {!onDevices && (
+        <SafeAreaView edges={["bottom"]} style={styles.bottomNav} accessibilityRole="tablist">
+          {TABS.map((tab) => {
+            const active = screen === tab;
+            return (
+              <Pressable
+                key={tab}
+                style={styles.navItem}
+                onPress={() => setScreen(tab)}
+                accessibilityRole="tab"
+                accessibilityLabel={tabLabel(language, tab)}
+                accessibilityState={{ selected: active }}
+              >
+                <Glyph name={tab} color={active ? "primary" : "onSurfaceVariant"} />
+                <Txt role="caption" bold={active} fixed lines={1} color={active ? "primary" : "onSurfaceVariant"}>
+                  {tabLabel(language, tab)}
+                </Txt>
+              </Pressable>
+            );
+          })}
+        </SafeAreaView>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  splash: { flex: 1, backgroundColor: THEME.background },
   root: { flex: 1, backgroundColor: THEME.appBar },
-  appBar: { height: 60, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 8, backgroundColor: THEME.appBar },
-  appBarButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  appBarGlyph: { color: THEME.onAppBar, fontSize: 24 },
-  appBarTitle: { flex: 1, color: THEME.onAppBar, fontSize: 22, fontWeight: "600" },
-  appBarStatus: { maxWidth: "50%", color: THEME.onAppBar, fontSize: 14, fontWeight: "700", paddingRight: 8 },
+  appBar: { height: SIZE.appBar, flexDirection: "row", alignItems: "center", gap: SPACE.sm, paddingHorizontal: SPACE.xs, backgroundColor: THEME.appBar },
+  appBarButton: { width: SIZE.touchMin, height: SIZE.touchMin, alignItems: "center", justifyContent: "center" },
+  appBarTitle: { flex: 1 },
+  appBarStatus: { maxWidth: "50%", paddingRight: SPACE.md },
   content: { flex: 1, backgroundColor: THEME.background },
   bottomNav: { flexDirection: "row", backgroundColor: THEME.bottomBar },
-  navItem: { flex: 1, alignItems: "center", paddingVertical: 8, gap: 2 },
-  navGlyph: { color: "#bdc1c6", fontSize: 20 },
-  navLabel: { color: "#bdc1c6", fontSize: 12 },
-  navActive: { color: THEME.primary, fontWeight: "700" },
+  navItem: { flex: 1, minHeight: SIZE.tabBar, alignItems: "center", justifyContent: "center" },
 });

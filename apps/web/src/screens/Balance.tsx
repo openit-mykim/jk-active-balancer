@@ -93,7 +93,7 @@ export function Balance(p: ScreenProps): ReactElement {
       </Card>
 
       {selected !== null && (
-        <Card title={`Cell ${String(selected).padStart(2, "0")}`}>
+        <Card title={t("cellN", { n: String(selected).padStart(2, "0") })}>
           <Row label={t("cellVoltages")} value={`${(info.cells[selected - 1]?.voltage ?? 0).toFixed(4)} V`} />
           <Row
             label={t("deltaVoltage")}
