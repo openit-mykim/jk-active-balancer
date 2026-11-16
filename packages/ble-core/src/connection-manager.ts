@@ -11,17 +11,22 @@ export type ConnectionState =
   | "ERROR"
   | "RECONNECT_WAIT";
 
+/**
+ * Allowed transitions. Every state may fall back to `IDLE` (user disconnect)
+ * or `ERROR` (link loss, timeout); `ERROR -> RECONNECT_WAIT -> CONNECTING`
+ * is the automatic reconnect path (design sections 18, 19).
+ */
 const TRANSITIONS: Readonly<Record<ConnectionState, readonly ConnectionState[]>> = {
   IDLE: ["SCANNING", "CONNECTING", "ERROR"],
   SCANNING: ["CONNECTING", "IDLE", "ERROR"],
   CONNECTING: ["DISCOVERING", "ERROR", "IDLE"],
-  DISCOVERING: ["SUBSCRIBING", "ERROR"],
-  SUBSCRIBING: ["IDENTIFYING", "ERROR"],
-  IDENTIFYING: ["READY", "ERROR"],
+  DISCOVERING: ["SUBSCRIBING", "ERROR", "IDLE"],
+  SUBSCRIBING: ["IDENTIFYING", "ERROR", "IDLE"],
+  IDENTIFYING: ["READY", "ERROR", "IDLE"],
   READY: ["STREAMING", "IDLE", "ERROR"],
   STREAMING: ["READY", "IDLE", "ERROR"],
   ERROR: ["RECONNECT_WAIT", "IDLE"],
-  RECONNECT_WAIT: ["CONNECTING", "IDLE"],
+  RECONNECT_WAIT: ["CONNECTING", "IDLE", "ERROR"],
 };
 
 /** Guards the BLE connection state machine; invalid transitions throw. */

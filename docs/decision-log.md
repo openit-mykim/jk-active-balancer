@@ -143,3 +143,19 @@ New decision:
   Unknown hardware revisions never get a writer (diagnostic mode).
 
 Reason: design sections 15, 35 (settings read is a Must), 36 (write -> readback).
+
+## D012 - BmsSession owns the connection lifecycle; transports report link loss
+
+Decision: `@jk-active-balancer/ble-core` adds `BmsSession`, which drives the
+design section 18 state machine (connect, identify with 0x97 and a 5 s timeout,
+profile resolution, 0x96, streaming), re-sends 0x96 until status arrives (as
+upstream `update()` does), runs the section 20 watchdog (stale > 5 s, stalled
+> 15 s -> reconnect) and the section 19 backoff (1, 2, 4, 8, 15, 30 s; manual
+reconnect skips it). `BleTransport` gains `onDisconnect()`; `connect()` may be
+called again after a link loss. All three transports (Web Bluetooth,
+react-native-ble-plx, mock) implement it.
+
+Reason: before this, the state machine, reconnect policy and pipeline existed
+but nothing wired them together, the Web adapter could not detect a dropped
+link, and the React Native adapter could not connect at all (its device factory
+always threw).

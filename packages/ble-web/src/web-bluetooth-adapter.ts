@@ -1,10 +1,8 @@
-import type { BleDevice, BleTransport } from "@jk-active-balancer/ble-core";
-import {
-  CHARACTERISTIC_SHORT_UUID,
-  SERVICE_SHORT_UUID,
-} from "@jk-active-balancer/jk-protocol";
+import { DisconnectListeners, NotificationQueue, type BleDevice, type BleTransport } from "@jk-active-balancer/ble-core";
+import { CHARACTERISTIC_SHORT_UUID, SERVICE_SHORT_UUID } from "@jk-active-balancer/jk-protocol";
 import {
   getWebBluetooth,
+  type WebBluetooth,
   type WebBluetoothCharacteristic,
   type WebBluetoothDevice,
 } from "./web-bluetooth-types";
@@ -22,37 +20,57 @@ export class WebBluetoothUnsupportedError extends Error {
   }
 }
 
+export interface WebBluetoothAdapterOptions {
+  /**
+   * Development-mode fallback for revisions that do not advertise FFE0
+   * (design section 24): also offer devices whose name starts with this
+   * prefix, e.g. `"JK-"`. Off by default.
+   */
+  readonly namePrefixFallback?: string;
+  /** Override `navigator.bluetooth` (tests). */
+  readonly bluetooth?: WebBluetooth | null;
+}
+
 /**
  * `BleTransport` over the Web Bluetooth API (design sections 23, 24).
  *
- * Phase 1 status: connection, GATT discovery and notification streaming are
- * implemented; a device picker with a `namePrefix` fallback for revisions that
- * do not advertise the service (design section 24) is left to the UI layer.
+ * The selected device is kept after a link loss so the session can reconnect
+ * without a new user gesture; `disconnect()` closes the link but keeps it too.
  */
 export class WebBluetoothAdapter implements BleTransport {
+  private readonly options: WebBluetoothAdapterOptions;
   private device: WebBluetoothDevice | null = null;
   private characteristic: WebBluetoothCharacteristic | null = null;
-  private readonly queue: Uint8Array[] = [];
-  private readonly waiters: Array<(value: IteratorResult<Uint8Array>) => void> = [];
-  private closed = false;
+  private readonly queue = new NotificationQueue();
+  private readonly disconnects = new DisconnectListeners();
+  private userDisconnecting = false;
+
+  constructor(options: WebBluetoothAdapterOptions = {}) {
+    this.options = options;
+  }
 
   /** Whether this environment exposes the Web Bluetooth API. */
   static isSupported(): boolean {
     return getWebBluetooth() !== null;
   }
 
+  private bluetooth(): WebBluetooth | null {
+    return this.options.bluetooth !== undefined ? this.options.bluetooth : getWebBluetooth();
+  }
+
+  /** Opens the browser device picker (must be called from a user gesture). */
   async scan(): Promise<readonly BleDevice[]> {
-    const bluetooth = getWebBluetooth();
+    const bluetooth = this.bluetooth();
     if (bluetooth === null) {
       throw new WebBluetoothUnsupportedError("Web Bluetooth is not available in this browser.");
     }
-    // Design section 24: filter by service first; a namePrefix fallback is a
-    // UI concern once we have a revision that fails the service filter.
-    const device = await bluetooth.requestDevice({
-      filters: [{ services: [SERVICE_SHORT_UUID] }],
-      optionalServices: [SERVICE_SHORT_UUID],
-    });
-    this.device = device;
+    // Design section 24: filter by service; optionally also by name prefix.
+    const filters: unknown[] = [{ services: [SERVICE_SHORT_UUID] }];
+    if (this.options.namePrefixFallback) {
+      filters.push({ namePrefix: this.options.namePrefixFallback });
+    }
+    const device = await bluetooth.requestDevice({ filters, optionalServices: [SERVICE_SHORT_UUID] });
+    this.attachDevice(device);
     return [{ id: device.id, name: device.name }];
   }
 
@@ -64,6 +82,10 @@ export class WebBluetoothAdapter implements BleTransport {
     if (device.id !== deviceId) {
       throw new Error(`WebBluetoothAdapter: unknown device id ${deviceId}`);
     }
+    this.userDisconnecting = false;
+    this.detachCharacteristic();
+    this.queue.reopen();
+
     const gatt = await device.gatt?.connect();
     if (gatt === undefined) {
       throw new WebBluetoothUnsupportedError("No GATT server on the selected device.");
@@ -72,23 +94,22 @@ export class WebBluetoothAdapter implements BleTransport {
     // (design section 34.5).
     const service = await gatt.getPrimaryService(SERVICE_SHORT_UUID);
     const characteristic = await service.getCharacteristic(CHARACTERISTIC_SHORT_UUID);
-    characteristic.addEventListener("characteristicvaluechanged", (event) => {
-      const source = event.target as unknown as WebBluetoothCharacteristic;
-      const view = source.value;
-      if (view === null) {
-        return;
-      }
-      this.deliver(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
-    });
-    await characteristic.startNotifications();
+    characteristic.addEventListener("characteristicvaluechanged", this.onValue);
     this.characteristic = characteristic;
+    await characteristic.startNotifications();
   }
 
   async disconnect(): Promise<void> {
-    this.closed = true;
-    this.device?.gatt?.disconnect();
-    this.device = null;
-    this.characteristic = null;
+    this.userDisconnecting = true;
+    this.detachCharacteristic();
+    this.queue.close();
+    if (this.device?.gatt?.connected) {
+      this.device.gatt.disconnect();
+    }
+  }
+
+  onDisconnect(listener: (error?: Error) => void): () => void {
+    return this.disconnects.add(listener);
   }
 
   async write(data: Uint8Array): Promise<void> {
@@ -96,30 +117,52 @@ export class WebBluetoothAdapter implements BleTransport {
     if (characteristic === null) {
       throw new Error("WebBluetoothAdapter: write() before connect()");
     }
-    await characteristic.writeValueWithoutResponse(data);
-  }
-
-  private deliver(fragment: Uint8Array): void {
-    const waiter = this.waiters.shift();
-    if (waiter) {
-      waiter({ value: fragment, done: false });
+    // Upstream writes with ESP_GATT_WRITE_TYPE_NO_RSP; fall back when the
+    // characteristic only allows acknowledged writes.
+    if (characteristic.writeValueWithoutResponse && characteristic.properties?.writeWithoutResponse !== false) {
+      await characteristic.writeValueWithoutResponse(data);
+    } else if (characteristic.writeValueWithResponse) {
+      await characteristic.writeValueWithResponse(data);
     } else {
-      this.queue.push(fragment);
+      await characteristic.writeValue(data);
     }
   }
 
   notifications(): AsyncIterable<Uint8Array> {
-    const next = (): Promise<IteratorResult<Uint8Array>> => {
-      const queued = this.queue.shift();
-      if (queued) {
-        return Promise.resolve({ value: queued, done: false });
-      }
-      if (this.closed) {
-        return Promise.resolve({ value: undefined, done: true });
-      }
-      return new Promise((resolve) => this.waiters.push(resolve));
-    };
-    const iterator: AsyncIterator<Uint8Array> = { next };
-    return { [Symbol.asyncIterator]: () => iterator };
+    return this.queue.iterable();
   }
+
+  private attachDevice(device: WebBluetoothDevice): void {
+    if (this.device !== null && this.device !== device) {
+      this.device.removeEventListener("gattserverdisconnected", this.onGattDisconnected);
+    }
+    if (this.device !== device) {
+      device.addEventListener("gattserverdisconnected", this.onGattDisconnected);
+    }
+    this.device = device;
+  }
+
+  private detachCharacteristic(): void {
+    this.characteristic?.removeEventListener("characteristicvaluechanged", this.onValue);
+    this.characteristic = null;
+  }
+
+  private readonly onValue = (event: Event): void => {
+    const source = event.target as unknown as WebBluetoothCharacteristic | null;
+    const view = source?.value;
+    if (!view) {
+      return;
+    }
+    // Copy: the browser may reuse the underlying buffer for the next event.
+    this.queue.push(new Uint8Array(view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength)));
+  };
+
+  private readonly onGattDisconnected = (): void => {
+    this.detachCharacteristic();
+    this.queue.close();
+    if (this.userDisconnecting) {
+      return;
+    }
+    this.disconnects.emit(new Error("GATT server disconnected"));
+  };
 }

@@ -2,4 +2,8 @@ export * from "./interface";
 export * from "./reconnect-policy";
 export * from "./connection-manager";
 export * from "./packet-pipeline";
+export * from "./watchdog";
+export * from "./packet-logger";
+export * from "./session";
+export * from "./debug-export";
 export * from "./mock-ble-transport";

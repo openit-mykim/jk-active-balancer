@@ -27,11 +27,11 @@ protocol code never contains UI thresholds or colours.
 | Package | Responsibility | Depends on |
 |---|---|---|
 | `@jk-active-balancer/jk-protocol` | JK04 constants, CRC, command builder, frame assembler, decoders, device profile | - |
-| `@jk-active-balancer/device-model` | Framework-agnostic battery/cell/balancer domain types and statistics | - |
-| `@jk-active-balancer/ble-core` | `BleTransport` interface, connection state machine, reconnect policy, packet pipeline, mock transport | jk-protocol |
+| `@jk-active-balancer/device-model` | Framework-agnostic domain types, statistics, active-cell-count priority, history + CSV | - |
+| `@jk-active-balancer/ble-core` | `BleTransport` interface, `BmsSession`, state machine, reconnect policy, watchdog, packet pipeline, raw logger, debug export, mock transport | jk-protocol |
 | `@jk-active-balancer/ble-web` | Web Bluetooth adapter | ble-core, jk-protocol |
-| `@jk-active-balancer/ble-react-native` | react-native-ble-plx adapter (structural) | ble-core, jk-protocol |
-| `@jk-active-balancer/ui-common` | Framework-agnostic layout helpers (cell grid) | device-model |
+| `@jk-active-balancer/ble-react-native` | react-native-ble-plx adapter (structural types, manager injected by the app) | ble-core, jk-protocol |
+| `@jk-active-balancer/ui-common` | Framework-agnostic layout helpers (cell grid, user-configurable cell colour thresholds) | device-model |
 | `apps/web` | Vite + React PWA (Web Bluetooth) | all of the above |
 | `apps/mobile` | React Native app skeleton | all of the above |
 
@@ -49,3 +49,21 @@ failure:  ERROR -> RECONNECT_WAIT -> CONNECTING
 
 Reconnect backoff is `1, 2, 4, 8, 15, 30` seconds, capped at 30 s (design
 section 19).
+
+`BmsSession` (ble-core) drives the machine end to end (decision D012):
+
+```text
+connect(device)
+  CONNECTING   transport.connect()  (GATT discovery + FFE1 notify)
+  DISCOVERING / SUBSCRIBING
+  IDENTIFYING  write 0x97, wait <= 5 s for the device-info frame
+               resolveProfile(model, HW, SW) -> verified | diagnostic
+  READY        write 0x96 (re-sent every 5 s until status arrives)
+  STREAMING    settings (0x01) + cell-info (0x02) frames
+watchdog       < 5 s fresh, 5-15 s STALE (values kept), > 15 s stalled -> reconnect
+link loss      transport.onDisconnect -> ERROR -> RECONNECT_WAIT -> CONNECTING
+```
+
+Supporting pieces in ble-core: `RawPacketLogger` (TX/RX/FRAME, off by default,
+design section 29), `buildDebugExport()` (design section 30, passcode masked,
+RX fragments never exported), `replayFragments()` (fixture replay, section 25).

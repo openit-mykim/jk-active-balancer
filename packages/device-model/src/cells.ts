@@ -71,3 +71,24 @@ export function computeCellStats(cells: readonly CellState[]): CellStats {
     averageCellVoltage: sum / activeCells,
   };
 }
+
+/**
+ * Active cell count, by the design section 41.2 priority:
+ * 1. cell count configured on the device (settings frame),
+ * 2. cells reporting a non-zero voltage in the latest cell-info frame,
+ * 3. the verified profile's `maxCells`.
+ * The BLE advertised name is never used. Clamped to the 24-cell UI maximum.
+ */
+export function resolveActiveCellCount(input: {
+  readonly settingsCellCount?: number;
+  readonly reportingCells?: number;
+  readonly profileMaxCells?: number;
+}): number {
+  const candidates = [input.settingsCellCount, input.reportingCells, input.profileMaxCells];
+  for (const candidate of candidates) {
+    if (candidate !== undefined && Number.isFinite(candidate) && candidate > 0) {
+      return Math.min(Math.trunc(candidate), 24);
+    }
+  }
+  return 0;
+}
