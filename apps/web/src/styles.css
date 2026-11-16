@@ -243,3 +243,48 @@ button.cell {
     flex-direction: column;
   }
 }
+
+.products {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.products th,
+.products td {
+  text-align: left;
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid #1f2c47;
+}
+
+.products tr.default td {
+  background: #14223a;
+}
+
+@media (max-width: 480px) {
+  .products th:nth-child(4),
+  .products td:nth-child(4) {
+    display: none;
+  }
+}
+
+/* Long option labels (product previews) must not widen the page on phones. */
+.app > * {
+  min-width: 0;
+}
+
+select {
+  max-width: 100%;
+}
+
+.row label {
+  max-width: 100%;
+}
+
+.row label select {
+  max-width: min(60vw, 22rem);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}

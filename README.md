@@ -2,7 +2,11 @@
 
 [한국어 README](README.ko.md)
 
-Unofficial open-source monitor for JiKong smart active balancers. Default device: **JK-B4A24S** (8S-24S, 4 A; protocol capture pending, decision D014). Upstream-documented profile: **JK-B2A16S** (JK04).
+Unofficial open-source monitor for JiKong smart active balancers: JK-B2A8S,
+JK-B2A16S, JK-DZ11B2A24S, JK-DZ08B2A24S and JK-B4A24S (default). The screen
+adapts to each product's cell range (8S / 16S / 24S). Only JK-B2A16S has an
+upstream-documented BLE protocol (JK04); the others are identified and captured
+until a capture confirms theirs (decisions D014, D015).
 Android and iOS via React Native, plus a Chrome (Web Bluetooth) PWA.
 
 > **Agent handoff:** if you are Hermes or another coding agent, read `AGENTS.md`

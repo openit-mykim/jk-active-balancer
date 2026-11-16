@@ -1,7 +1,7 @@
 /**
- * Protocol family. `UNKNOWN` marks a device the app targets but whose BLE
- * protocol has not been confirmed from upstream or a physical capture yet:
- * no frame decoder is applied to it (design section 44).
+ * Protocol family. `UNKNOWN` marks a device the app supports at the product
+ * level but whose BLE protocol has not been confirmed from upstream or a
+ * physical capture yet: no frame decoder is applied to it (design section 44).
  */
 export type JkProtocol = "JK04" | "UNKNOWN";
 
@@ -17,22 +17,78 @@ export interface DeviceCapabilities {
   readonly settingsWrite: boolean;
 }
 
-/** A verified device profile. */
+/**
+ * Product facts from the seller specification sheet (owner-provided image,
+ * 2026-11-16). They drive the UI (cell range, rated current, interface badges)
+ * but are never protocol evidence (design section 43).
+ */
+export interface ProductSpec {
+  /** Display name, e.g. "JK-B4A24S". */
+  readonly model: string;
+  /** Supported series cell count (same for Li-ion, LiFePO4 and LTO). */
+  readonly minCells: number;
+  readonly maxCells: number;
+  /** Rated active-balancing current in amps. */
+  readonly ratedBalanceCurrent: number;
+  readonly interfaces: {
+    readonly bluetooth: boolean;
+    readonly rs485: boolean;
+    readonly can: boolean;
+    /** NTC temperature detection. */
+    readonly ntc: boolean;
+  };
+}
+
+/** A device profile: product facts plus what is verified about its protocol. */
 export interface DeviceProfile {
   readonly id: string;
   readonly modelPatterns: readonly RegExp[];
-  /** Hardware revisions the profile was verified against (design section 17). */
+  /** Hardware revisions the protocol was verified against (design section 17). */
   readonly hardwareVersions: readonly string[];
-  /** Software revisions the profile was verified against. */
+  /** Software revisions the protocol was verified against. */
   readonly softwareVersions: readonly string[];
   readonly protocol: JkProtocol;
+  /** Same as `spec.maxCells`; kept for the design section 16 shape. */
   readonly maxCells: number;
+  readonly spec: ProductSpec;
+  /** Where the protocol claim (or its absence) comes from. */
+  readonly protocolEvidence: string;
   readonly capabilities: DeviceCapabilities;
 }
 
+const NO_CAPABILITIES: DeviceCapabilities = {
+  deviceInfo: true,
+  cellVoltage: false,
+  balanceCurrent: false,
+  cellWireResistance: false,
+  balancerSwitch: false,
+  settingsRead: false,
+  settingsWrite: false,
+};
+
+/** A product whose BLE protocol still has to be captured (decision D015). */
+function captureFirst(
+  id: string,
+  pattern: RegExp,
+  spec: ProductSpec,
+  protocolEvidence: string,
+): DeviceProfile {
+  return {
+    id,
+    modelPatterns: [pattern],
+    hardwareVersions: [],
+    softwareVersions: [],
+    protocol: "UNKNOWN",
+    maxCells: spec.maxCells,
+    spec,
+    protocolEvidence,
+    capabilities: NO_CAPABILITIES,
+  };
+}
+
 /**
- * Phase 1 verified profile (upstream `syssi/esphome-jk-bms@3.0.0` README:
- * "JK-B2A16S, hw 3.0, sw 3.3.0, using JK04").
+ * JK-B2A16S - upstream `syssi/esphome-jk-bms@3.0.0` README: "JK-B2A16S,
+ * hw 3.0, sw 3.3.0, using JK04". The only product with BLE protocol evidence.
  *
  * The write capabilities are deliberately `false`: upstream defines a JK04
  * balancer-switch register, but no physical read-back has been performed yet
@@ -40,11 +96,19 @@ export interface DeviceProfile {
  */
 export const JK_B2A16S_PROFILE: DeviceProfile = {
   id: "jk-b2a16s-hw3",
-  modelPatterns: [/^JK-B2A16S/i],
+  modelPatterns: [/^JK[-_]?B2A16S/i],
   hardwareVersions: ["3.0"],
   softwareVersions: ["3.3.0"],
   protocol: "JK04",
   maxCells: 16,
+  spec: {
+    model: "JK-B2A16S",
+    minCells: 8,
+    maxCells: 16,
+    ratedBalanceCurrent: 2,
+    interfaces: { bluetooth: true, rs485: false, can: false, ntc: false },
+  },
+  protocolEvidence: "upstream syssi/esphome-jk-bms@3.0.0 README: hw 3.0 / sw 3.3.0 using JK04",
   capabilities: {
     deviceInfo: true,
     cellVoltage: true,
@@ -57,44 +121,82 @@ export const JK_B2A16S_PROFILE: DeviceProfile = {
 };
 
 /**
- * JK-B4A24S - the owner's device and the app's default target (decision D014).
- *
- * Upstream `syssi/esphome-jk-bms` (3.0.0 and main, checked 2026-11-16) has no
- * report for this model. Its relatives use different protocols (JK-B5A24S
- * hw 8.x -> JK04; JK-B2A24S hw 10.x -> JK02_24S; hw 11.x -> JK02_32S), so the
- * protocol must come from a physical capture.
- *
- * Seller specification sheet (owner-provided, 2026-11-16; product material is
- * not protocol evidence, design section 43): 8S-24S (Li-ion / LiFePO4 / LTO),
- * 4 A active balancing, Bluetooth only (no RS485, CAN or NTC). It belongs to
- * the same active-balancer line as JK-B2A8S / JK-B2A16S, which makes JK04
- * likely - but only a capture decides. Until then the device is
- * identified (the 0x03 device-info frame is shared by all protocols upstream)
- * and every other frame is captured raw, never decoded.
+ * JK-B4A24S - the owner's device and the default target (decision D014).
+ * Upstream (3.0.0 and main, checked 2026-11-16) has no report; same product
+ * line as JK-B2A8S / JK-B2A16S, which makes JK04 likely but not proven.
  */
-export const JK_B4A24S_PROFILE: DeviceProfile = {
-  id: "jk-b4a24s",
-  modelPatterns: [/^JK[-_]?B4A24S/i],
-  hardwareVersions: [],
-  softwareVersions: [],
-  protocol: "UNKNOWN",
-  maxCells: 24,
-  capabilities: {
-    deviceInfo: true,
-    cellVoltage: false,
-    balanceCurrent: false,
-    cellWireResistance: false,
-    balancerSwitch: false,
-    settingsRead: false,
-    settingsWrite: false,
+export const JK_B4A24S_PROFILE: DeviceProfile = captureFirst(
+  "jk-b4a24s",
+  /^JK[-_]?B4A24S/i,
+  {
+    model: "JK-B4A24S",
+    minCells: 8,
+    maxCells: 24,
+    ratedBalanceCurrent: 4,
+    interfaces: { bluetooth: true, rs485: false, can: false, ntc: false },
   },
-};
+  "no upstream report (checked 2026-11-16); JK04 likely by product line - capture required",
+);
 
-/** Model the apps present as their default target. */
+/**
+ * JK-B2A8S active balancer. Not the JK-B2A8S20P / 30P *BMS* that upstream
+ * lists (those use JK02_24S / JK02_32S) - a different product.
+ */
+export const JK_B2A8S_PROFILE: DeviceProfile = captureFirst(
+  "jk-b2a8s",
+  /^JK[-_]?B2A8S(?!\d)/i,
+  {
+    model: "JK-B2A8S",
+    minCells: 4,
+    maxCells: 8,
+    ratedBalanceCurrent: 2,
+    interfaces: { bluetooth: true, rs485: false, can: false, ntc: false },
+  },
+  "no upstream BLE report for the balancer (upstream JK-B2A8S20P is a BMS) - capture required",
+);
+
+/**
+ * JK-DZ11-B2A24S. Upstream supports it over RS485 only (`jk_balancer`
+ * component, issue #17 / PR #18, hw 6.0); its BLE protocol is unknown.
+ */
+export const JK_DZ11B2A24S_PROFILE: DeviceProfile = captureFirst(
+  "jk-dz11-b2a24s",
+  /^JK[-_]?DZ11[-_]?B2A24S/i,
+  {
+    model: "JK-DZ11B2A24S",
+    minCells: 8,
+    maxCells: 24,
+    ratedBalanceCurrent: 2,
+    interfaces: { bluetooth: true, rs485: true, can: false, ntc: true },
+  },
+  "upstream supports RS485 only (jk_balancer, issue #17, hw 6.0); BLE protocol unknown - capture required",
+);
+
+/** JK-DZ08-B2A24S (CAN variant). No upstream report. */
+export const JK_DZ08B2A24S_PROFILE: DeviceProfile = captureFirst(
+  "jk-dz08-b2a24s",
+  /^JK[-_]?DZ08[-_]?B2A24S/i,
+  {
+    model: "JK-DZ08B2A24S",
+    minCells: 8,
+    maxCells: 24,
+    ratedBalanceCurrent: 2,
+    interfaces: { bluetooth: true, rs485: false, can: true, ntc: true },
+  },
+  "no upstream report - capture required",
+);
+
+/** Model the apps present as their default target (decision D014). */
 export const DEFAULT_TARGET_PROFILE: DeviceProfile = JK_B4A24S_PROFILE;
 
-/** All profiles this build knows about. */
-export const KNOWN_PROFILES: readonly DeviceProfile[] = [JK_B4A24S_PROFILE, JK_B2A16S_PROFILE];
+/** All supported products, in the order of the seller specification sheet. */
+export const KNOWN_PROFILES: readonly DeviceProfile[] = [
+  JK_B2A8S_PROFILE,
+  JK_B2A16S_PROFILE,
+  JK_DZ11B2A24S_PROFILE,
+  JK_DZ08B2A24S_PROFILE,
+  JK_B4A24S_PROFILE,
+];
 
 /**
  * Select a profile from a decoded vendor/model string.
@@ -115,12 +217,15 @@ export function selectProfile(vendorId: string): DeviceProfile | null {
 
 /**
  * How the app may talk to a device:
- * - `verified`   : model + hardware revision match a known profile;
- * - `diagnostic` : unknown model or unknown hardware revision - read-only
- *                  diagnostics and raw capture only, never settings write
- *                  (design sections 17, 44).
+ * - `verified`   : model + hardware revision match a profile with a known
+ *                  protocol; frames are decoded;
+ * - `diagnostic` : unknown model, revision or protocol - read-only raw capture,
+ *                  never decoded, never written (design sections 17, 44);
+ * - `preview`    : demo / layout preview only (synthetic frames, labelled in
+ *                  the UI); frames are decoded, writes are never allowed.
+ *                  Never produced by {@link resolveProfile}.
  */
-export type ProfileMode = "verified" | "diagnostic";
+export type ProfileMode = "verified" | "diagnostic" | "preview";
 
 export interface ProfileResolution {
   readonly mode: ProfileMode;
@@ -141,8 +246,9 @@ export interface DeviceIdentity {
 
 /**
  * Resolve the profile for an identified device (design section 17):
- * `JK-B2A16S` + hardware `3.0` selects JK04; any other hardware revision enters
- * read-only diagnostic mode ("Unknown JK-B2A16S revision").
+ * `JK-B2A16S` + hardware `3.0` selects JK04; a known product with an
+ * unconfirmed protocol, an unknown revision or an unknown model enters
+ * read-only diagnostic mode.
  */
 export function resolveProfile(identity: DeviceIdentity): ProfileResolution {
   const profile = selectProfile(identity.vendorId);
@@ -178,5 +284,32 @@ export function resolveProfile(identity: DeviceIdentity): ProfileResolution {
     reason: softwareUnverified
       ? `${profile.protocol} selected; SW ${identity.softwareVersion} has not been verified (reference ${profile.softwareVersions.join(", ")})`
       : `${profile.protocol} selected`,
+  };
+}
+
+/**
+ * Demo-only resolution: treat a product as decodable with the JK04 layout so
+ * the UI can be previewed for its cell range from SYNTHETIC frames. The UI
+ * must label it PREVIEW; writes stay impossible (the writer requires
+ * `verified`).
+ */
+export function previewProfile(profile: DeviceProfile): ProfileResolution {
+  return {
+    mode: "preview",
+    profile: {
+      ...profile,
+      protocol: "JK04",
+      capabilities: {
+        ...profile.capabilities,
+        cellVoltage: true,
+        balanceCurrent: true,
+        cellWireResistance: true,
+        settingsRead: true,
+        balancerSwitch: false,
+        settingsWrite: false,
+      },
+    },
+    softwareUnverified: true,
+    reason: `PREVIEW: synthetic ${profile.spec.model} frames read with the JK04 layout - not a device measurement`,
   };
 }

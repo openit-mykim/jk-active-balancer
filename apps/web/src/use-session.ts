@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { BmsSession, MockBleTransport, RawPacketLogger, type BleTransport, type SessionSnapshot } from "@jk-active-balancer/ble-core";
 import { WebBluetoothAdapter } from "@jk-active-balancer/ble-web";
 import { CellHistory } from "@jk-active-balancer/device-model";
-import { sum8 } from "@jk-active-balancer/jk-protocol";
+import { KNOWN_PROFILES, previewProfile, resolveProfile, sum8 } from "@jk-active-balancer/jk-protocol";
+import { buildDemoFrames } from "@jk-active-balancer/ble-core";
 import { FIXTURES } from "./fixtures";
 
 /** SYNTHETIC: upstream B2A16S device-info frame with the model renamed to JK-B4A24S. */
@@ -13,7 +14,13 @@ function renamedDeviceInfo(model: string): Uint8Array {
   return frame;
 }
 
-export type TransportMode = "web-bluetooth" | "demo" | "demo-b4a24s";
+/**
+ * - web-bluetooth: real device
+ * - demo: JK-B2A16S upstream fixture replay
+ * - demo-b4a24s: SYNTHETIC JK-B4A24S diagnostic-capture flow
+ * - preview:<profile id>: SYNTHETIC layout preview for a product's cell range
+ */
+export type TransportMode = "web-bluetooth" | "demo" | "demo-b4a24s" | `preview:${string}`;
 
 export interface SessionHandle {
   readonly mode: TransportMode;
@@ -22,7 +29,28 @@ export interface SessionHandle {
   readonly history: CellHistory;
 }
 
+function previewTarget(mode: TransportMode) {
+  return mode.startsWith("preview:") ? (KNOWN_PROFILES.find((p) => `preview:${p.id}` === mode) ?? null) : null;
+}
+
 function createTransport(mode: TransportMode, namePrefixFallback: boolean): BleTransport {
+  const preview = previewTarget(mode);
+  if (preview) {
+    const frames = buildDemoFrames(
+      { deviceInfo: FIXTURES.deviceInfo, settings: FIXTURES.settings, cellInfo: FIXTURES.balanced },
+      preview.spec.model,
+      preview.spec.maxCells,
+      { maxBalanceCurrent: preview.spec.ratedBalanceCurrent },
+    );
+    return new MockBleTransport({
+      devices: [{ id: `preview-${preview.id}`, name: `${preview.spec.model} (layout preview)` }],
+      deviceInfoFrames: [frames.deviceInfo],
+      settingsFrames: [frames.settings],
+      cellInfoFrames: [...frames.cellInfo],
+      fragmentSize: 20,
+      streamIntervalMs: 1000,
+    });
+  }
   if (mode === "demo" || mode === "demo-b4a24s") {
     const b4 = mode === "demo-b4a24s";
     return new MockBleTransport({
@@ -41,7 +69,12 @@ function createTransport(mode: TransportMode, namePrefixFallback: boolean): BleT
 export function useSessionHandle(mode: TransportMode, namePrefixFallback: boolean, loggerEnabled: boolean): SessionHandle {
   const handle = useMemo<SessionHandle>(() => {
     const logger = new RawPacketLogger({ enabled: false, maxEntries: 2000 });
-    const session = new BmsSession({ transport: createTransport(mode, namePrefixFallback), logger });
+    const preview = previewTarget(mode);
+    const session = new BmsSession({
+      transport: createTransport(mode, namePrefixFallback),
+      logger,
+      resolveProfile: preview ? () => previewProfile(preview) : resolveProfile,
+    });
     return { mode, session, logger, history: new CellHistory(3600, 1000) };
   }, [mode, namePrefixFallback]);
 

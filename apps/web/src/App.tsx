@@ -5,8 +5,8 @@ import {
   type SessionSnapshot,
 } from "@jk-active-balancer/ble-core";
 import { WebBluetoothAdapter } from "@jk-active-balancer/ble-web";
-import { historyToCsv, resolveActiveCellCount } from "@jk-active-balancer/device-model";
-import { DEFAULT_TARGET_PROFILE, cellLayoutHint, parseHex, type JkCellInfo } from "@jk-active-balancer/jk-protocol";
+import { checkCellRange, historyToCsv, resolveActiveCellCount } from "@jk-active-balancer/device-model";
+import { DEFAULT_TARGET_PROFILE, KNOWN_PROFILES, cellLayoutHint, parseHex, type DeviceProfile, type JkCellInfo } from "@jk-active-balancer/jk-protocol";
 import {
   DEFAULT_CELL_COLOR_THRESHOLDS,
   classifyCellVoltage,
@@ -55,8 +55,8 @@ export function App(): ReactElement {
       <header>
         <h1>jk-active-balancer</h1>
         <p className="subtitle">
-          JK active balancer monitor - default device JK-B4A24S ({DEFAULT_TARGET_PROFILE.maxCells}S max,
-          protocol capture pending), JK-B2A16S (JK04). Unofficial, not affiliated with JiKong. NOT HARDWARE VERIFIED.
+          JK active balancer monitor - {KNOWN_PROFILES.length} products, default {DEFAULT_TARGET_PROFILE.spec.model}. Unofficial, not
+          affiliated with JiKong. NOT HARDWARE VERIFIED.
         </p>
       </header>
       <ConnectionPanel
@@ -72,6 +72,7 @@ export function App(): ReactElement {
       {snapshot.profile?.mode === "diagnostic" && <CapturePanel handle={handle} snapshot={snapshot} />}
       {snapshot.cellInfo && <Dashboard handle={handle} snapshot={snapshot} now={now} />}
       {snapshot.settings && <SettingsPanel handle={handle} snapshot={snapshot} />}
+      <ProductsPanel mode={mode} setMode={setMode} busy={snapshot.connection !== "IDLE"} />
       <DiagnosticsPanel
         handle={handle}
         snapshot={snapshot}
@@ -136,6 +137,11 @@ function ConnectionPanel(props: {
             </option>
             <option value="demo">Demo: JK-B2A16S (fixture replay)</option>
             <option value="demo-b4a24s">Demo: JK-B4A24S capture (synthetic)</option>
+            {KNOWN_PROFILES.map((p) => (
+              <option key={p.id} value={`preview:${p.id}`}>
+                Preview: {p.spec.model} {p.spec.maxCells}S layout (synthetic)
+              </option>
+            ))}
           </select>
         </label>
         {!connected && (
@@ -161,6 +167,12 @@ function ConnectionPanel(props: {
         </p>
       )}
       {props.mode === "demo" && <p className="muted">{DEMO_LABEL}</p>}
+      {props.mode.startsWith("preview:") && (
+        <p className="muted">
+          SYNTHETIC layout preview: JK04-layout frames generated for this product's maximum cell count. Shows how the
+          screen adapts; not a measurement and not a protocol claim for this product.
+        </p>
+      )}
       {props.mode === "demo-b4a24s" && (
         <p className="muted">
           SYNTHETIC: the JK-B2A16S fixtures with the model renamed, to show the JK-B4A24S diagnostic capture flow. Not a
@@ -200,11 +212,16 @@ function DevicePanel({ snapshot }: { snapshot: SessionSnapshot }): ReactElement 
         <dd>{profile?.profile?.protocol ?? "UNKNOWN"}</dd>
         <dt>Profile</dt>
         <dd>
-          <span className={`badge ${profile?.mode === "verified" ? "ok" : "warn"}`}>
-            {profile?.mode === "verified" ? "VERIFIED" : "READ-ONLY DIAGNOSTIC"}
-          </span>{" "}
-          <span className="muted">{profile?.reason}</span>
+          <ModeBadge mode={profile?.mode} /> <span className="muted">{profile?.reason}</span>
         </dd>
+        {profile?.profile && (
+          <>
+            <dt>Product spec</dt>
+            <dd>
+              <SpecSummary profile={profile.profile} />
+            </dd>
+          </>
+        )}
         <dt>Name</dt>
         <dd>{info.deviceName || "-"}</dd>
         <dt>Uptime / power-on count</dt>
@@ -273,6 +290,85 @@ function CapturePanel({ handle, snapshot }: { handle: SessionHandle; snapshot: S
   );
 }
 
+function ModeBadge({ mode }: { mode: string | undefined }): ReactElement {
+  if (mode === "verified") return <span className="badge ok">VERIFIED</span>;
+  if (mode === "preview") return <span className="badge warn">PREVIEW (synthetic)</span>;
+  return <span className="badge warn">READ-ONLY DIAGNOSTIC</span>;
+}
+
+function SpecSummary({ profile }: { profile: DeviceProfile }): ReactElement {
+  const s = profile.spec;
+  const ifs = (["bluetooth", "rs485", "can", "ntc"] as const).filter((k) => s.interfaces[k]);
+  return (
+    <span>
+      {s.minCells}S-{s.maxCells}S · {s.ratedBalanceCurrent} A rated ·{" "}
+      {ifs.map((k) => (
+        <span key={k} className="badge" style={{ marginRight: 4 }}>
+          {k === "bluetooth" ? "BLE" : k.toUpperCase()}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** The products this build supports (seller specification sheet, D015). */
+function ProductsPanel(props: { mode: TransportMode; setMode: (m: TransportMode) => void; busy: boolean }): ReactElement {
+  return (
+    <section className="panel">
+      <h2>Supported products</h2>
+      <div className="table-wrap">
+      <table className="products">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Cells</th>
+            <th>Balance</th>
+            <th>Interfaces</th>
+            <th>BLE protocol</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {KNOWN_PROFILES.map((p) => (
+            <tr key={p.id} className={p.id === DEFAULT_TARGET_PROFILE.id ? "default" : ""}>
+              <td>
+                {p.spec.model}
+                {p.id === DEFAULT_TARGET_PROFILE.id && <span className="badge ok"> default</span>}
+              </td>
+              <td>
+                {p.spec.minCells}-{p.spec.maxCells}S
+              </td>
+              <td>{p.spec.ratedBalanceCurrent} A</td>
+              <td className="small">
+                {[p.spec.interfaces.rs485 && "RS485", p.spec.interfaces.can && "CAN", p.spec.interfaces.ntc && "NTC"]
+                  .filter(Boolean)
+                  .join(" / ") || "BLE only"}
+              </td>
+              <td className="small" title={p.protocolEvidence}>
+                {p.protocol === "UNKNOWN" ? "capture pending" : `${p.protocol} (upstream)`}
+              </td>
+              <td>
+                <button
+                  type="button"
+                  disabled={props.busy || props.mode === `preview:${p.id}`}
+                  onClick={() => props.setMode(`preview:${p.id}`)}
+                >
+                  Preview
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      </div>
+      <p className="muted small">
+        Specs from the seller sheet. Only JK-B2A16S has an upstream-documented BLE protocol; the others are identified
+        and captured raw until a capture confirms theirs. Preview renders SYNTHETIC frames for the product's cell range.
+      </p>
+    </section>
+  );
+}
+
 function formatDuration(seconds: number): string {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -296,6 +392,9 @@ function Dashboard({ handle, snapshot, now }: { handle: SessionHandle; snapshot:
   });
   const grid = computeCellGridLayout(activeCells);
   const balancerEnabled = snapshot.settings?.balancerEnabled;
+  const spec = snapshot.profile?.profile?.spec;
+  const reported = snapshot.settings?.cellCount ?? info.activeCells;
+  const range = spec ? checkCellRange(reported, spec) : ({ ok: true } as const);
 
   const saveThresholds = (next: CellColorThresholds): void => {
     setThresholds(next);
@@ -321,11 +420,18 @@ function Dashboard({ handle, snapshot, now }: { handle: SessionHandle; snapshot:
           label="Balancing"
           value={info.balancer === "idle" ? "Idle" : info.balancer === "unknown" ? `0x${info.balancerStatusByte.toString(16)}` : `Active (${info.balancer})`}
         />
-        <Stat label="Balance current" value={`${v(info.balancingCurrent)} A`} />
+        <Stat
+          label={spec ? `Balance current (rated ${spec.ratedBalanceCurrent} A)` : "Balance current"}
+          value={`${v(info.balancingCurrent)} A`}
+        />
       </div>
+      {!range.ok && <p className="error">{range.message}</p>}
+      {spec?.interfaces.ntc && (
+        <p className="muted small">This product has NTC temperature inputs; temperature is not decoded yet.</p>
+      )}
 
       <h3>
-        Cells ({activeCells}S)
+        Cells ({activeCells}S{spec ? ` of ${spec.minCells}-${spec.maxCells}S` : ""})
         {capabilities?.cellWireResistance && (
           <label className="muted small">
             <input type="checkbox" checked={showResistance} onChange={(e) => setShowResistance(e.target.checked)} />{" "}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CellHistory, historyToCsv, resolveActiveCellCount } from "../src/index";
+import { CellHistory, checkCellRange, historyToCsv, resolveActiveCellCount } from "../src/index";
 
 describe("CellHistory / CSV export", () => {
   it("throttles, bounds and exports samples", () => {
@@ -25,5 +25,19 @@ describe("resolveActiveCellCount (design section 41.2)", () => {
     expect(resolveActiveCellCount({ settingsCellCount: 0, reportingCells: 7 })).toBe(7);
     expect(resolveActiveCellCount({ settingsCellCount: 40 })).toBe(24);
     expect(resolveActiveCellCount({})).toBe(0);
+  });
+});
+
+describe("product cell range (decision D015)", () => {
+  it("caps the grid at the product's maximum cells", () => {
+    expect(resolveActiveCellCount({ settingsCellCount: 16, profileMaxCells: 8 })).toBe(8);
+    expect(resolveActiveCellCount({ reportingCells: 24, profileMaxCells: 24 })).toBe(24);
+  });
+
+  it("warns outside the specified range", () => {
+    const b4 = { minCells: 8, maxCells: 24 };
+    expect(checkCellRange(16, b4)).toEqual({ ok: true });
+    expect(checkCellRange(6, b4)).toMatchObject({ ok: false, kind: "below-min" });
+    expect(checkCellRange(10, { minCells: 4, maxCells: 8 })).toMatchObject({ ok: false, kind: "above-max" });
   });
 });

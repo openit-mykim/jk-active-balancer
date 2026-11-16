@@ -15,23 +15,51 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   BmsSession,
   MockBleTransport,
+  buildDemoFrames,
   RawPacketLogger,
   buildDebugExport,
   type BleDevice,
   type SessionSnapshot,
 } from "@jk-active-balancer/ble-core";
-import { resolveActiveCellCount } from "@jk-active-balancer/device-model";
-import { cellLayoutHint, parseHex } from "@jk-active-balancer/jk-protocol";
+import { checkCellRange, resolveActiveCellCount } from "@jk-active-balancer/device-model";
+import { DEFAULT_TARGET_PROFILE, KNOWN_PROFILES, cellLayoutHint, parseHex, previewProfile, resolveProfile, type DeviceProfile } from "@jk-active-balancer/jk-protocol";
 import { classifyCellVoltage, computeCellGridLayout } from "@jk-active-balancer/ui-common";
 import { createBleAdapter, ensureBlePermissions, onBluetoothStateChange } from "./ble/ble-manager";
 import { FIXTURE_HEX } from "./fixtures.generated";
 
 const APP_VERSION = "0.1.0";
-type Mode = "ble" | "demo";
+/** ble: real device; demo: JK-B2A16S fixture replay; preview:<id>: SYNTHETIC product layout. */
+type Mode = "ble" | "demo" | `preview:${string}`;
 const SWITCH_TRACK = { false: "#2c3d63", true: "#2f8f5b" };
+
+function previewTarget(mode: Mode): DeviceProfile | null {
+  return KNOWN_PROFILES.find((p) => `preview:${p.id}` === mode) ?? null;
+}
 
 function createSession(mode: Mode): { session: BmsSession; logger: RawPacketLogger } {
   const logger = new RawPacketLogger({ enabled: __DEV__, maxEntries: 1000 });
+  const preview = previewTarget(mode);
+  if (preview) {
+    const frames = buildDemoFrames(
+      {
+        deviceInfo: parseHex(FIXTURE_HEX.deviceInfo),
+        settings: parseHex(FIXTURE_HEX.settings),
+        cellInfo: parseHex(FIXTURE_HEX.balanced),
+      },
+      preview.spec.model,
+      preview.spec.maxCells,
+      { maxBalanceCurrent: preview.spec.ratedBalanceCurrent },
+    );
+    const transport = new MockBleTransport({
+      devices: [{ id: `preview-${preview.id}`, name: `${preview.spec.model} (layout preview)` }],
+      deviceInfoFrames: [frames.deviceInfo],
+      settingsFrames: [frames.settings],
+      cellInfoFrames: [...frames.cellInfo],
+      fragmentSize: 20,
+      streamIntervalMs: 1000,
+    });
+    return { session: new BmsSession({ transport, logger, resolveProfile: () => previewProfile(preview) }), logger };
+  }
   const transport =
     mode === "demo"
       ? new MockBleTransport({
@@ -43,7 +71,7 @@ function createSession(mode: Mode): { session: BmsSession; logger: RawPacketLogg
           streamIntervalMs: 1000,
         })
       : createBleAdapter();
-  return { session: new BmsSession({ transport, logger }), logger };
+  return { session: new BmsSession({ transport, logger, resolveProfile }), logger };
 }
 
 export function App(): ReactElement {
@@ -121,7 +149,7 @@ export function App(): ReactElement {
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.title}>jk-active-balancer</Text>
           <Text style={styles.muted}>
-            Default device JK-B4A24S (protocol capture pending) · JK-B2A16S (JK04). Unofficial. NOT HARDWARE VERIFIED.
+            {KNOWN_PROFILES.length} products · default {DEFAULT_TARGET_PROFILE.spec.model}. Unofficial. NOT HARDWARE VERIFIED.
           </Text>
 
           <Card title="Connection">
@@ -138,7 +166,7 @@ export function App(): ReactElement {
             {(message ?? snapshot.lastError) ? <Text style={styles.error}>{message ?? snapshot.lastError}</Text> : null}
             <View style={styles.row}>
               <Text style={styles.text}>Demo (fixture replay)</Text>
-              <Switch trackColor={SWITCH_TRACK} thumbColor="#e6edf7" value={mode === "demo"} disabled={!idle} onValueChange={(on) => setMode(on ? "demo" : "ble")} />
+              <Switch trackColor={SWITCH_TRACK} thumbColor="#e6edf7" value={mode !== "ble"} disabled={!idle} onValueChange={(on) => setMode(on ? "demo" : "ble")} />
             </View>
             <View style={styles.row}>
               {idle && <Button label="Scan" onPress={() => void scan()} />}
@@ -147,6 +175,11 @@ export function App(): ReactElement {
               )}
               {!idle && <Button label="Disconnect" onPress={() => void session.disconnect()} />}
             </View>
+            {mode.startsWith("preview:") && (
+              <Text style={styles.muted}>
+                SYNTHETIC layout preview for {previewTarget(mode)?.spec.model}. Not a measurement or protocol claim.
+              </Text>
+            )}
             {mode === "demo" && (
               <Text style={styles.muted}>
                 Upstream-documented frames + 1 synthetic unbalanced frame. Not a device measurement.
@@ -185,6 +218,30 @@ export function App(): ReactElement {
               <Text style={styles.muted}>Settings write is disabled until verified on hardware.</Text>
             </Card>
           )}
+
+          <Card title="Supported products">
+            {KNOWN_PROFILES.map((p) => (
+              <Pressable
+                key={p.id}
+                style={styles.device}
+                disabled={!idle}
+                onPress={() => {
+                  setDevices([]);
+                  setMode(`preview:${p.id}`);
+                }}
+              >
+                <Text style={styles.text}>
+                  {p.spec.model}
+                  {p.id === DEFAULT_TARGET_PROFILE.id ? "  · default" : ""}
+                  {mode === `preview:${p.id}` ? "  · previewing" : ""}
+                </Text>
+                <Text style={styles.muted}>
+                  {specLine(p)} · BLE protocol: {p.protocol === "UNKNOWN" ? "capture pending" : `${p.protocol} (upstream)`}
+                </Text>
+              </Pressable>
+            ))}
+            <Text style={styles.muted}>Tap a product to preview its layout (synthetic), then Scan.</Text>
+          </Card>
 
           <Card title="Diagnostics">
             <Text style={styles.muted}>
@@ -231,7 +288,11 @@ function DeviceCard({ snapshot }: { snapshot: SessionSnapshot }): ReactElement {
       <KV k="Model" v={info.vendorId} />
       <KV k="HW / SW" v={`${info.hardwareVersion} / ${info.softwareVersion}`} />
       <KV k="Protocol" v={profile?.profile?.protocol ?? "UNKNOWN"} />
-      <KV k="Profile" v={profile?.mode === "verified" ? "VERIFIED" : "READ-ONLY DIAGNOSTIC"} />
+      <KV
+        k="Profile"
+        v={profile?.mode === "verified" ? "VERIFIED" : profile?.mode === "preview" ? "PREVIEW (synthetic)" : "READ-ONLY DIAGNOSTIC"}
+      />
+      {profile?.profile && <KV k="Product spec" v={specLine(profile.profile)} />}
       {profile && <Text style={styles.muted}>{profile.reason}</Text>}
     </Card>
   );
@@ -266,6 +327,12 @@ function CaptureCard({ snapshot, onShare }: { snapshot: SessionSnapshot; onShare
   );
 }
 
+function specLine(p: DeviceProfile): string {
+  const i = p.spec.interfaces;
+  const extras = [i.rs485 && "RS485", i.can && "CAN", i.ntc && "NTC"].filter(Boolean).join("/");
+  return `${p.spec.minCells}-${p.spec.maxCells}S · ${p.spec.ratedBalanceCurrent} A${extras ? ` · ${extras}` : ""}`;
+}
+
 function PackCard({ snapshot }: { snapshot: SessionSnapshot }): ReactElement {
   const info = snapshot.cellInfo;
   if (!info) return <></>;
@@ -276,6 +343,8 @@ function PackCard({ snapshot }: { snapshot: SessionSnapshot }): ReactElement {
     profileMaxCells: snapshot.profile?.profile?.maxCells,
   });
   const grid = computeCellGridLayout(activeCells);
+  const spec = snapshot.profile?.profile?.spec;
+  const range = spec ? checkCellRange(snapshot.settings?.cellCount ?? info.activeCells, spec) : ({ ok: true } as const);
   const columns = Array.from({ length: grid.columns }, (_v, c) => grid.placements.filter((p) => p.column === c));
   const balancing =
     info.balancer === "idle" ? "Idle" : info.balancer === "unknown" ? `0x${info.balancerStatusByte.toString(16)}` : `Active (${info.balancer})`;
@@ -290,9 +359,16 @@ function PackCard({ snapshot }: { snapshot: SessionSnapshot }): ReactElement {
         <Stat label="Delta" value={`${info.deltaCellVoltage.toFixed(4)} V`} />
         <Stat label="Balancer" value={snapshot.settings ? (snapshot.settings.balancerEnabled ? "ENABLED" : "DISABLED") : "-"} />
         <Stat label="Balancing" value={balancing} />
-        <Stat label="Balance current" value={`${info.balancingCurrent.toFixed(3)} A`} />
+        <Stat
+          label={spec ? `Balance current / ${spec.ratedBalanceCurrent} A` : "Balance current"}
+          value={`${info.balancingCurrent.toFixed(3)} A`}
+        />
       </View>
-      <Text style={styles.subtitle}>Cells ({activeCells}S)</Text>
+      {!range.ok && <Text style={styles.error}>{range.message}</Text>}
+      {spec?.interfaces.ntc && <Text style={styles.muted}>NTC temperature inputs present; not decoded yet.</Text>}
+      <Text style={styles.subtitle}>
+        Cells ({activeCells}S{spec ? ` of ${spec.minCells}-${spec.maxCells}S` : ""})
+      </Text>
       <View style={[styles.grid, stale && styles.dim]}>
         {columns.map((column, c) => (
           <View key={c} style={styles.column}>

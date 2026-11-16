@@ -8,6 +8,7 @@ import {
   type JkDeviceInfo,
   type JkSettings,
   type JkSettingsWriter,
+  type DeviceIdentity,
   type ProfileResolution,
 } from "@jk-active-balancer/jk-protocol";
 import { ConnectionStateMachine, type ConnectionState } from "./connection-manager";
@@ -67,6 +68,11 @@ export interface BmsSessionOptions {
   /** Reconnect automatically after an unexpected disconnect. Default true. */
   readonly autoReconnect?: boolean;
   readonly now?: () => number;
+  /**
+   * Profile resolution. Defaults to `resolveProfile` from jk-protocol; only
+   * demos inject `previewProfile` (labelled PREVIEW in the UI).
+   */
+  readonly resolveProfile?: (identity: DeviceIdentity) => ProfileResolution;
 }
 
 const MAX_EVENTS = 200;
@@ -95,6 +101,7 @@ export class BmsSession {
   private readonly watchdogIntervalMs: number;
   private readonly autoReconnect: boolean;
   private readonly now: () => number;
+  private readonly resolve: (identity: DeviceIdentity) => ProfileResolution;
 
   private readonly machine = new ConnectionStateMachine();
   private readonly pipeline = new PacketPipeline();
@@ -128,6 +135,7 @@ export class BmsSession {
     this.watchdogIntervalMs = options.watchdogIntervalMs ?? 1000;
     this.autoReconnect = options.autoReconnect ?? true;
     this.now = options.now ?? Date.now;
+    this.resolve = options.resolveProfile ?? resolveProfile;
     this.unsubscribeDisconnect = this.transport.onDisconnect((error) => this.handleLinkLoss(error));
   }
 
@@ -271,7 +279,7 @@ export class BmsSession {
       const info = await waiting;
       this.assertGeneration(generation);
 
-      const profile = resolveProfile(info);
+      const profile = this.resolve(info);
       this.update({ profile });
       this.transition("READY", profile.reason);
 
@@ -338,7 +346,8 @@ export class BmsSession {
     // non-identification frame is captured raw and never shown as data
     // (design sections 17, 44): a JK02 frame read with the JK04 layout would
     // produce plausible-looking but wrong numbers.
-    const decodeAllowed = this.state.profile?.mode === "verified";
+    const mode = this.state.profile?.mode;
+    const decodeAllowed = mode === "verified" || mode === "preview";
     if (!decodeAllowed && decoded.kind !== "device-info") {
       this.logger.log("FRAME", decoded.frame, { frame: name, decoded: "captured raw (diagnostic mode, not decoded)" });
       this.update(base);

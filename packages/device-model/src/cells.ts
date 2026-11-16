@@ -84,11 +84,33 @@ export function resolveActiveCellCount(input: {
   readonly reportingCells?: number;
   readonly profileMaxCells?: number;
 }): number {
+  // The product never has more cells than its profile allows (e.g. 8 for
+  // JK-B2A8S), so a corrupt or foreign value cannot widen the grid.
+  const cap = input.profileMaxCells !== undefined && input.profileMaxCells > 0 ? Math.min(input.profileMaxCells, 24) : 24;
   const candidates = [input.settingsCellCount, input.reportingCells, input.profileMaxCells];
   for (const candidate of candidates) {
     if (candidate !== undefined && Number.isFinite(candidate) && candidate > 0) {
-      return Math.min(Math.trunc(candidate), 24);
+      return Math.min(Math.trunc(candidate), cap);
     }
   }
   return 0;
+}
+
+/** Result of checking a reported cell count against the product's range. */
+export type CellRangeCheck =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly kind: "below-min" | "above-max"; readonly message: string };
+
+/**
+ * Compare the cell count the device reports with the product's supported
+ * range (e.g. JK-B4A24S 8S-24S). The UI shows the message; nothing is hidden.
+ */
+export function checkCellRange(reported: number, range: { readonly minCells: number; readonly maxCells: number }): CellRangeCheck {
+  if (reported > range.maxCells) {
+    return { ok: false, kind: "above-max", message: `Device reports ${reported} cells; this product supports at most ${range.maxCells}S. Showing ${range.maxCells}.` };
+  }
+  if (reported > 0 && reported < range.minCells) {
+    return { ok: false, kind: "below-min", message: `Device reports ${reported} cells; this product is specified for ${range.minCells}S-${range.maxCells}S.` };
+  }
+  return { ok: true };
 }

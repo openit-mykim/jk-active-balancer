@@ -2,9 +2,10 @@
 
 [English README](README.md)
 
-지콩(JiKong) 스마트 액티브 밸런서용 비공식 오픈소스 모니터입니다. 기본 장치는
-**JK-B4A24S**(8S-24S, 4A, 프로토콜 캡처 대기, 결정 D014)이고, 업스트림 문서화 프로파일은
-**JK-B2A16S**(JK04)입니다. Android/iOS는 React Native, 데스크톱·Android Chrome은 Web Bluetooth
+지콩(JiKong) 스마트 액티브 밸런서용 비공식 오픈소스 모니터입니다. 지원 제품은
+JK-B2A8S, JK-B2A16S, JK-DZ11B2A24S, JK-DZ08B2A24S, JK-B4A24S(기본)이며, 화면은 제품의
+셀 범위(8S/16S/24S)에 맞춰 바뀝니다. 업스트림에 BLE 프로토콜(JK04) 근거가 있는 제품은
+JK-B2A16S뿐이고, 나머지는 캡처로 확정할 때까지 식별·원시 캡처만 합니다(결정 D014, D015). Android/iOS는 React Native, 데스크톱·Android Chrome은 Web Bluetooth
 PWA로 동작합니다.
 
 > **에이전트 인계:** Hermes 또는 다른 코딩 에이전트는 `AGENTS.md`를 먼저 읽고
