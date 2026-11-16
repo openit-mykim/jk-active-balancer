@@ -260,3 +260,35 @@ Layout preview: `previewProfile()` + `buildDemoFrames()` render SYNTHETIC
 JK04-layout frames for a product's maximum cell count, so every product's
 screen can be checked without hardware. Mode `preview` decodes but can never
 write, and the UI labels it PREVIEW. `resolveProfile()` never returns it.
+
+## D016 - UI structure follows jbd-bms-manager
+
+Decision: web and mobile share the information architecture and visual
+language of the sibling app `openit-mykim/jbd-bms-manager`
+(`docs/navigation-design.md` there), so both apps feel like one family:
+
+- top app bar: device-list button, current destination title, connection
+  status on the right ("미연결" / "연결됨" / "데이터 지연" / "재연결 대기");
+- five bottom-navigation destinations, language-neutral routes
+  `overview / detail / balance / control / settings`
+  (개요 / 상세 / 밸런스 / 제어 / 설정);
+- a full-screen "장치" (Devices) screen: Bluetooth scan, demos, the
+  supported-product list with layout previews;
+- 개요: status card, pack voltage as the primary metric, reconnect banner;
+- 상세: history trend (pack voltage / cell delta / balance current) with CSV
+  export, then device, product and connection groups;
+- 밸런스: min / max / average / delta and every cell, banded
+  normal / caution / danger (#2E7D32 / #EF6C00 / #C62828);
+- 제어: a locked maintenance workspace holding the read-only balancer
+  settings, protocol capture and diagnostics (raw logger, debug export) -
+  "balance = observe, control = maintenance", as in jbd-bms-manager;
+- 설정: the app only (language, cell colour thresholds, developer options,
+  app info).
+
+Shared pieces live in `@jk-active-balancer/ui-common`: `TABS`, `THEME`,
+Korean / English strings (`translate`, `resolveLanguage`) and
+`connectionStatusKey`. Icons are drawn in-house (web SVG, mobile glyphs and a
+View-drawn padlock) - no third-party icon set or native SVG dependency.
+
+Mobile preferences are in memory only (no storage dependency yet); web
+preferences persist in localStorage.

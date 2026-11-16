@@ -26,3 +26,8 @@ export function classifyCellVoltage(
   if (deviation >= thresholds.warnDeviation) return "warn";
   return "ok";
 }
+
+/** Map the colour class to the jbd-bms-manager band names. */
+export function cellBand(cls: CellColorClass): "normal" | "caution" | "danger" {
+  return cls === "alert" ? "danger" : cls === "warn" ? "caution" : "normal";
+}
