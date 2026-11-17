@@ -332,3 +332,13 @@ and needs the owner's approval.
 - Release signing reads `JK_RELEASE_*` from the environment or
   `~/.gradle/gradle.properties`; without them the build stays debug-signed and
   the release guard blocks it.
+
+## D019 - iOS development on hold (2026-11-17, owner decision)
+
+- The owner decided not to proceed with iOS development for now. Android and
+  the web PWA are the targets.
+- The existing iOS project (`apps/mobile/ios`) and the CI `ios-build` job stay
+  as they are so the shared code keeps compiling for iOS, but no iOS-only
+  features, device testing, signing or store work is done.
+- Changes must not break the iOS build; if the job becomes a burden, removing
+  it is a new decision.

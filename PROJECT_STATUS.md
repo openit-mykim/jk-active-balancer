@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-11-16
+Last updated: 2026-11-17
 
 ## Current phase
 
@@ -47,7 +47,7 @@ protocol `JK04` / read-only + diagnostics (design sections 0, 35, 44).
   -PreactNativeArchitectures=arm64-v8a` succeeds; the APK installed on an
   LG-F800S (Android 9) reaches STREAMING in demo mode and renders device,
   pack and 16S grid.
-- Not run: iOS build (needs macOS; CI job added, not yet observed green), real
+- Not run: local iOS build (iOS on hold, D019; the CI `ios-build` job is green), real
   BLE scan/connect on a phone, any JK-B2A16S hardware.
 
 Hardware validation status: **NOT HARDWARE VERIFIED**.
@@ -65,7 +65,9 @@ Hardware validation status: **NOT HARDWARE VERIFIED**.
 2. Run the section 36 acceptance checks: identification, cell values vs the
    official app, 30-minute stability, Bluetooth OFF -> ON reconnect, corrupt
    frame handling.
-3. Observe the `android-build` and `ios-build` CI jobs green.
+3. ~~Observe the `android-build` and `ios-build` CI jobs green.~~ Done:
+   both green on PRs #1-#6, all merged to `main` on 2026-11-17. iOS work
+   is on hold (D019).
 4. Only after a physical read-back test: enable `balancerSwitch` /
    `settingsWrite` in the profile and add a balancer ON/OFF control.
 
@@ -80,7 +82,7 @@ Must:
 - [x] Raw packet logger, debug export, fixture replay
 - [x] Chrome PWA build
 - [x] Android build (local release APK; CI job added)
-- [ ] iOS build (project + CI job added; not built - no macOS here)
+- [ ] iOS build - **on hold by owner decision (D019)**; project kept, CI `ios-build` green
 - [ ] Physical JK-B2A16S capture and section 36 acceptance
 
 Should:
