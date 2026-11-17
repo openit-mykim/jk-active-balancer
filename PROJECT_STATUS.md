@@ -89,9 +89,23 @@ Should:
 - [x] Balance start / delta voltage write - **not possible over JK04** (no upstream register; D011)
 - [x] History chart, CSV export (web)
 
+## Supported products (D015)
+
+| Model | Cells | Balance | BLE protocol |
+|---|---|---|---|
+| JK-B2A8S | 4-8S | 2 A | capture pending |
+| JK-B2A16S | 8-16S | 2 A | JK04 (upstream) |
+| JK-DZ11B2A24S | 8-24S | 2 A | capture pending (upstream: RS485 only) |
+| JK-DZ08B2A24S | 8-24S | 2 A | capture pending |
+| JK-B4A24S (default) | 8-24S | 4 A | capture pending |
+
+The UI adapts to each product (grid columns, range warning, rated current,
+interface badges); every product can be previewed with SYNTHETIC frames.
+
 ## Product decisions already made
 
 - Default target device: JK-B4A24S, capture-first (D014); JK-B2A16S remains the verified-by-upstream JK04 profile.
+- Five products supported with spec-driven UI; protocols other than JK-B2A16S are confirmed by capture (D015).
 - Primary transport: BLE (Web Bluetooth on Chrome, react-native-ble-plx on mobile).
 - Local-first; no account or cloud.
 - JK-B2A16S / JK04 only in Phase 1.

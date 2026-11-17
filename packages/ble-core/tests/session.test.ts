@@ -4,6 +4,8 @@ import { MockBleTransport } from "../src/mock-ble-transport";
 import { RawPacketLogger } from "../src/packet-logger";
 import { BmsSession } from "../src/session";
 import { buildDebugExport } from "../src/debug-export";
+import { buildDemoFrames } from "../src/demo-frames";
+import { previewProfile, selectProfile } from "@jk-active-balancer/jk-protocol";
 import { BALANCED, BAD_CHECKSUM, DEVICE_INFO, SETTINGS, UNBALANCED } from "./helpers/fixtures";
 
 const DEVICE = { id: "mock-jk-b2a16s", name: "JK-B2A16S" };
@@ -251,6 +253,42 @@ describe("BmsSession with the JK-B4A24S default target (protocol not confirmed)"
     const captured = report.capturedFrames as Record<string, { hex: string }>;
     expect(captured.CELL_INFO.hex.startsWith("55 AA EB 90 02")).toBe(true);
     expect(captured.DEVICE_INFO.hex).toContain("**");
+    session.dispose();
+  });
+});
+
+describe("product layout preview (SYNTHETIC frames)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ["JK-B2A8S", 8],
+    ["JK-B2A16S", 16],
+    ["JK-B4A24S", 24],
+  ])("decodes a %s preview with %i cells and refuses writes", async (model, cells) => {
+    const rated = selectProfile(model)!.spec.ratedBalanceCurrent;
+    const frames = buildDemoFrames({ deviceInfo: DEVICE_INFO, settings: SETTINGS, cellInfo: BALANCED }, model, cells, {
+      maxBalanceCurrent: rated,
+    });
+    const transport = new MockBleTransport({
+      deviceInfoFrames: [frames.deviceInfo],
+      settingsFrames: [frames.settings],
+      cellInfoFrames: [...frames.cellInfo],
+      fragmentSize: 20,
+    });
+    const profile = selectProfile(model);
+    const session = new BmsSession({ transport, resolveProfile: () => previewProfile(profile!) });
+    await session.connect({ id: model, name: model });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(session.snapshot.profile?.mode).toBe("preview");
+    expect(session.snapshot.settings?.cellCount).toBe(cells);
+    expect(session.snapshot.cellInfo?.activeCells).toBe(cells);
+    expect(session.snapshot.settings?.maxBalanceCurrent).toBe(rated);
+    await expect(session.settingsWriter().setBalancerEnabled(true)).rejects.toThrow(/disabled/);
     session.dispose();
   });
 });

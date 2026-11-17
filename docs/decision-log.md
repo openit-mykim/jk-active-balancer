@@ -226,3 +226,37 @@ frames with the JK04 layout even in diagnostic mode. Decoding now requires a
 Next: capture from the physical JK-B4A24S, add `*.captured.hex` fixtures,
 compare against the official app, then set the profile's protocol, revisions
 and capabilities in a new decision.
+
+## D015 - Five supported products; the UI adapts to each product's cell range
+
+Decision: the apps support the five JiKong active balancers on the seller
+specification sheet (owner-provided, 2026-11-16). Each `DeviceProfile` now
+carries a `spec` (cell range, rated balance current, interfaces) and a
+`protocolEvidence` string, kept apart from the protocol capability so product
+material never unlocks decoding (design section 43).
+
+| Model | Cells | Balance | Interfaces | BLE protocol (evidence) |
+|---|---|---|---|---|
+| JK-B2A8S | 4-8S | 2 A | BLE | unknown - capture (upstream "JK-B2A8S20P" is a BMS, a different product) |
+| JK-B2A16S | 8-16S | 2 A | BLE | JK04 (upstream README, hw 3.0 / sw 3.3.0) |
+| JK-DZ11B2A24S | 8-24S | 2 A | BLE, RS485, NTC | unknown - capture (upstream supports RS485 only: `jk_balancer`, issue #17, hw 6.0) |
+| JK-DZ08B2A24S | 8-24S | 2 A | BLE, CAN, NTC | unknown - capture |
+| JK-B4A24S (default, D014) | 8-24S | 4 A | BLE | unknown - capture |
+
+Note: the sheet gives JK-B2A16S as 8S-16S; design doc v1.1 calls it 2S-16S.
+The sheet value is used for the range warning.
+
+UI behaviour, driven by the profile (web and mobile):
+- cell grid capped at the product's `maxCells` (`resolveActiveCellCount`),
+  8 cells per column -> 1 / 2 / 3 columns for 8S / 16S / 24S products;
+- `checkCellRange()` warns when the device reports cells outside the product
+  range; nothing is hidden;
+- balance current shown against the product's rated current;
+- interface badges, and an NTC note for products with temperature inputs
+  (temperature is not decoded - no evidence for its layout);
+- a "Supported products" list with each product's protocol status.
+
+Layout preview: `previewProfile()` + `buildDemoFrames()` render SYNTHETIC
+JK04-layout frames for a product's maximum cell count, so every product's
+screen can be checked without hardware. Mode `preview` decodes but can never
+write, and the UI labels it PREVIEW. `resolveProfile()` never returns it.

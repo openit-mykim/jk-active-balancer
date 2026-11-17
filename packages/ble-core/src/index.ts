@@ -7,3 +7,4 @@ export * from "./packet-logger";
 export * from "./session";
 export * from "./debug-export";
 export * from "./mock-ble-transport";
+export * from "./demo-frames";
