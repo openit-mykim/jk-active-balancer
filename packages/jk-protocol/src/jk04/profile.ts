@@ -1,5 +1,9 @@
-/** Protocol family understood by this package. */
-export type JkProtocol = "JK04";
+/**
+ * Protocol family. `UNKNOWN` marks a device the app targets but whose BLE
+ * protocol has not been confirmed from upstream or a physical capture yet:
+ * no frame decoder is applied to it (design section 44).
+ */
+export type JkProtocol = "JK04" | "UNKNOWN";
 
 /** Capability flags for a device profile (design sections 16, 41.4). */
 export interface DeviceCapabilities {
@@ -52,8 +56,45 @@ export const JK_B2A16S_PROFILE: DeviceProfile = {
   },
 };
 
+/**
+ * JK-B4A24S - the owner's device and the app's default target (decision D014).
+ *
+ * Upstream `syssi/esphome-jk-bms` (3.0.0 and main, checked 2026-11-16) has no
+ * report for this model. Its relatives use different protocols (JK-B5A24S
+ * hw 8.x -> JK04; JK-B2A24S hw 10.x -> JK02_24S; hw 11.x -> JK02_32S), so the
+ * protocol must come from a physical capture.
+ *
+ * Seller specification sheet (owner-provided, 2026-11-16; product material is
+ * not protocol evidence, design section 43): 8S-24S (Li-ion / LiFePO4 / LTO),
+ * 4 A active balancing, Bluetooth only (no RS485, CAN or NTC). It belongs to
+ * the same active-balancer line as JK-B2A8S / JK-B2A16S, which makes JK04
+ * likely - but only a capture decides. Until then the device is
+ * identified (the 0x03 device-info frame is shared by all protocols upstream)
+ * and every other frame is captured raw, never decoded.
+ */
+export const JK_B4A24S_PROFILE: DeviceProfile = {
+  id: "jk-b4a24s",
+  modelPatterns: [/^JK[-_]?B4A24S/i],
+  hardwareVersions: [],
+  softwareVersions: [],
+  protocol: "UNKNOWN",
+  maxCells: 24,
+  capabilities: {
+    deviceInfo: true,
+    cellVoltage: false,
+    balanceCurrent: false,
+    cellWireResistance: false,
+    balancerSwitch: false,
+    settingsRead: false,
+    settingsWrite: false,
+  },
+};
+
+/** Model the apps present as their default target. */
+export const DEFAULT_TARGET_PROFILE: DeviceProfile = JK_B4A24S_PROFILE;
+
 /** All profiles this build knows about. */
-export const KNOWN_PROFILES: readonly DeviceProfile[] = [JK_B2A16S_PROFILE];
+export const KNOWN_PROFILES: readonly DeviceProfile[] = [JK_B4A24S_PROFILE, JK_B2A16S_PROFILE];
 
 /**
  * Select a profile from a decoded vendor/model string.
@@ -111,6 +152,14 @@ export function resolveProfile(identity: DeviceIdentity): ProfileResolution {
       profile: null,
       softwareUnverified: true,
       reason: `Unknown device profile "${identity.vendorId}" - read-only diagnostic mode`,
+    };
+  }
+  if (profile.protocol === "UNKNOWN") {
+    return {
+      mode: "diagnostic",
+      profile,
+      softwareUnverified: true,
+      reason: `${identity.vendorId} identified (HW ${identity.hardwareVersion}, SW ${identity.softwareVersion}); protocol not confirmed yet - capturing raw frames, nothing is decoded`,
     };
   }
   if (!profile.hardwareVersions.includes(identity.hardwareVersion)) {

@@ -2,7 +2,7 @@
 
 [한국어 README](README.ko.md)
 
-Unofficial open-source monitor for the **JiKong JK-B2A16S 2S-16S 2A Smart Active Balancer**.
+Unofficial open-source monitor for JiKong smart active balancers. Default device: **JK-B4A24S** (8S-24S, 4 A; protocol capture pending, decision D014). Upstream-documented profile: **JK-B2A16S** (JK04).
 Android and iOS via React Native, plus a Chrome (Web Bluetooth) PWA.
 
 > **Agent handoff:** if you are Hermes or another coding agent, read `AGENTS.md`

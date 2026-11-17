@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JK_B2A16S_PROFILE, resolveProfile, selectProfile } from "../src/jk04/profile";
+import { DEFAULT_TARGET_PROFILE, JK_B2A16S_PROFILE, resolveProfile, selectProfile } from "../src/jk04/profile";
 import { parseHex, toHex } from "../src/jk04/hex";
 
 describe("device profile", () => {
@@ -53,5 +53,22 @@ describe("hex helpers", () => {
   it("round-trips with mixed separators", () => {
     expect(toHex(parseHex("0x55 0xAA eb.90:02"))).toBe("55 AA EB 90 02");
     expect(() => parseHex("55 ZZ")).toThrow(/invalid byte/);
+  });
+});
+
+describe("JK-B4A24S default target (decision D014)", () => {
+  it("is the default target and is identified but kept in diagnostic mode", () => {
+    expect(DEFAULT_TARGET_PROFILE.id).toBe("jk-b4a24s");
+    expect(DEFAULT_TARGET_PROFILE.maxCells).toBe(24);
+    for (const vendorId of ["JK-B4A24S", "JK_B4A24S", "JKB4A24S"]) {
+      const r = resolveProfile({ vendorId, hardwareVersion: "1.0", softwareVersion: "1.0" });
+      expect(r.mode).toBe("diagnostic");
+      expect(r.profile?.protocol).toBe("UNKNOWN");
+    }
+  });
+
+  it("grants no decode or write capability until the protocol is confirmed", () => {
+    const c = DEFAULT_TARGET_PROFILE.capabilities;
+    expect([c.cellVoltage, c.settingsRead, c.settingsWrite, c.balancerSwitch]).toEqual([false, false, false, false]);
   });
 });

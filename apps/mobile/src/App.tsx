@@ -21,7 +21,7 @@ import {
   type SessionSnapshot,
 } from "@jk-active-balancer/ble-core";
 import { resolveActiveCellCount } from "@jk-active-balancer/device-model";
-import { parseHex } from "@jk-active-balancer/jk-protocol";
+import { cellLayoutHint, parseHex } from "@jk-active-balancer/jk-protocol";
 import { classifyCellVoltage, computeCellGridLayout } from "@jk-active-balancer/ui-common";
 import { createBleAdapter, ensureBlePermissions, onBluetoothStateChange } from "./ble/ble-manager";
 import { FIXTURE_HEX } from "./fixtures.generated";
@@ -120,7 +120,9 @@ export function App(): ReactElement {
       <SafeAreaView style={styles.root}>
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.title}>jk-active-balancer</Text>
-          <Text style={styles.muted}>Unofficial JK-B2A16S / JK04 monitor. NOT HARDWARE VERIFIED.</Text>
+          <Text style={styles.muted}>
+            Default device JK-B4A24S (protocol capture pending) · JK-B2A16S (JK04). Unofficial. NOT HARDWARE VERIFIED.
+          </Text>
 
           <Card title="Connection">
             <Text style={styles.text}>
@@ -168,6 +170,9 @@ export function App(): ReactElement {
           </Card>
 
           {snapshot.deviceInfo && <DeviceCard snapshot={snapshot} />}
+          {snapshot.profile?.mode === "diagnostic" && (
+            <CaptureCard snapshot={snapshot} onShare={() => shareDebug(false)} />
+          )}
           {snapshot.cellInfo && <PackCard snapshot={snapshot} />}
           {snapshot.settings && (
             <Card title="Balancer settings (read-only)">
@@ -228,6 +233,35 @@ function DeviceCard({ snapshot }: { snapshot: SessionSnapshot }): ReactElement {
       <KV k="Protocol" v={profile?.profile?.protocol ?? "UNKNOWN"} />
       <KV k="Profile" v={profile?.mode === "verified" ? "VERIFIED" : "READ-ONLY DIAGNOSTIC"} />
       {profile && <Text style={styles.muted}>{profile.reason}</Text>}
+    </Card>
+  );
+}
+
+/** Design section 44: unknown profile -> read-only diagnostic capture. */
+function CaptureCard({ snapshot, onShare }: { snapshot: SessionSnapshot; onShare: () => void }): ReactElement {
+  const frames = Object.entries(snapshot.capturedFrames);
+  const cell = snapshot.capturedFrames.CELL_INFO;
+  const hint = cell ? cellLayoutHint(parseHex(cell.hex)) : null;
+  return (
+    <Card title="Protocol capture · DIAGNOSTIC">
+      <Text style={styles.muted}>
+        This device's protocol is not confirmed, so values are not decoded. Stay connected until CELL_INFO and SETTINGS
+        appear, then share the capture with the developer.
+      </Text>
+      {frames.length === 0 ? (
+        <Text style={styles.text}>waiting for frames...</Text>
+      ) : (
+        frames.map(([type, f]) => <KV key={type} k={type} v={`${f.count} frame(s)`} />)
+      )}
+      {hint && (
+        <Text style={styles.muted}>
+          Layout hint: {hint.likely} (JK04 {hint.jk04PlausibleCells} / JK02 {hint.jk02PlausibleCells} plausible cells) -
+          hint only
+        </Text>
+      )}
+      <View style={styles.row}>
+        <Button label="Share capture" onPress={onShare} />
+      </View>
     </Card>
   );
 }

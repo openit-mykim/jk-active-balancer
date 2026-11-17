@@ -1,4 +1,5 @@
 import {
+  toHex,
   buildCellInfoCommand,
   buildDeviceInfoCommand,
   createSettingsWriter,
@@ -47,6 +48,11 @@ export interface SessionSnapshot {
   readonly lastError?: string;
   readonly parserErrors: readonly ParserError[];
   readonly framesReceived: number;
+  /**
+   * Latest checksum-valid raw frame per frame type (e.g. "CELL_INFO"), always
+   * kept - this is what a diagnostic-mode capture exports (design section 44).
+   */
+  readonly capturedFrames: Readonly<Record<string, { readonly hex: string; readonly count: number; readonly at: number }>>;
 }
 
 export interface BmsSessionOptions {
@@ -101,6 +107,7 @@ export class BmsSession {
     reconnectAttempt: 0,
     parserErrors: [],
     framesReceived: 0,
+    capturedFrames: {},
   };
 
   /** Bumped on every (re)connect so stale async work can bail out. */
@@ -314,7 +321,33 @@ export class BmsSession {
       return;
     }
 
-    const base = { lastValidFrameAt: at, framesReceived: this.state.framesReceived + 1, freshness: "fresh" as const };
+    const previous = this.state.capturedFrames[name];
+    const capturedFrames = {
+      ...this.state.capturedFrames,
+      [name]: { hex: toHex(decoded.frame), count: (previous?.count ?? 0) + 1, at },
+    };
+    const base = {
+      lastValidFrameAt: at,
+      framesReceived: this.state.framesReceived + 1,
+      freshness: "fresh" as const,
+      capturedFrames,
+    };
+
+    // Only a verified profile may have its frames decoded. Before
+    // identification, or for an unknown model / revision / protocol, every
+    // non-identification frame is captured raw and never shown as data
+    // (design sections 17, 44): a JK02 frame read with the JK04 layout would
+    // produce plausible-looking but wrong numbers.
+    const decodeAllowed = this.state.profile?.mode === "verified";
+    if (!decodeAllowed && decoded.kind !== "device-info") {
+      this.logger.log("FRAME", decoded.frame, { frame: name, decoded: "captured raw (diagnostic mode, not decoded)" });
+      this.update(base);
+      if (decoded.frame[4] === 0x02 && this.machine.current === "READY") {
+        this.transition("STREAMING", "diagnostic capture");
+      }
+      return;
+    }
+
     switch (decoded.kind) {
       case "device-info": {
         const v = decoded.value;

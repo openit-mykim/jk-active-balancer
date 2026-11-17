@@ -2,9 +2,18 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { BmsSession, MockBleTransport, RawPacketLogger, type BleTransport, type SessionSnapshot } from "@jk-active-balancer/ble-core";
 import { WebBluetoothAdapter } from "@jk-active-balancer/ble-web";
 import { CellHistory } from "@jk-active-balancer/device-model";
+import { sum8 } from "@jk-active-balancer/jk-protocol";
 import { FIXTURES } from "./fixtures";
 
-export type TransportMode = "web-bluetooth" | "demo";
+/** SYNTHETIC: upstream B2A16S device-info frame with the model renamed to JK-B4A24S. */
+function renamedDeviceInfo(model: string): Uint8Array {
+  const frame = Uint8Array.from(FIXTURES.deviceInfo);
+  for (let i = 0; i < 16; i += 1) frame[6 + i] = i < model.length ? model.charCodeAt(i) : 0;
+  frame[299] = sum8(frame.subarray(0, 299));
+  return frame;
+}
+
+export type TransportMode = "web-bluetooth" | "demo" | "demo-b4a24s";
 
 export interface SessionHandle {
   readonly mode: TransportMode;
@@ -14,10 +23,11 @@ export interface SessionHandle {
 }
 
 function createTransport(mode: TransportMode, namePrefixFallback: boolean): BleTransport {
-  if (mode === "demo") {
+  if (mode === "demo" || mode === "demo-b4a24s") {
+    const b4 = mode === "demo-b4a24s";
     return new MockBleTransport({
-      devices: [{ id: "demo-jk-b2a16s", name: "JK-B2A16S (fixture replay)" }],
-      deviceInfoFrames: [FIXTURES.deviceInfo],
+      devices: [b4 ? { id: "demo-jk-b4a24s", name: "JK-B4A24S (synthetic capture demo)" } : { id: "demo-jk-b2a16s", name: "JK-B2A16S (fixture replay)" }],
+      deviceInfoFrames: [b4 ? renamedDeviceInfo("JK-B4A24S") : FIXTURES.deviceInfo],
       settingsFrames: [FIXTURES.settings],
       cellInfoFrames: [FIXTURES.balanced, FIXTURES.unbalanced],
       fragmentSize: 20,

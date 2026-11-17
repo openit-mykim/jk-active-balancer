@@ -8,3 +8,4 @@ export * from "./jk04/decoder-status";
 export * from "./jk04/decoder-settings";
 export * from "./jk04/encoder-settings";
 export * from "./jk04/profile";
+export * from "./jk04/layout-hint";

@@ -6,7 +6,7 @@ import {
 } from "@jk-active-balancer/ble-core";
 import { WebBluetoothAdapter } from "@jk-active-balancer/ble-web";
 import { historyToCsv, resolveActiveCellCount } from "@jk-active-balancer/device-model";
-import type { JkCellInfo } from "@jk-active-balancer/jk-protocol";
+import { DEFAULT_TARGET_PROFILE, cellLayoutHint, parseHex, type JkCellInfo } from "@jk-active-balancer/jk-protocol";
 import {
   DEFAULT_CELL_COLOR_THRESHOLDS,
   classifyCellVoltage,
@@ -55,7 +55,8 @@ export function App(): ReactElement {
       <header>
         <h1>jk-active-balancer</h1>
         <p className="subtitle">
-          JK-B2A16S / JK04 monitor - unofficial, not affiliated with JiKong. NOT HARDWARE VERIFIED.
+          JK active balancer monitor - default device JK-B4A24S ({DEFAULT_TARGET_PROFILE.maxCells}S max,
+          protocol capture pending), JK-B2A16S (JK04). Unofficial, not affiliated with JiKong. NOT HARDWARE VERIFIED.
         </p>
       </header>
       <ConnectionPanel
@@ -68,6 +69,7 @@ export function App(): ReactElement {
         setNamePrefixFallback={setNamePrefixFallback}
       />
       {snapshot.deviceInfo && <DevicePanel snapshot={snapshot} />}
+      {snapshot.profile?.mode === "diagnostic" && <CapturePanel handle={handle} snapshot={snapshot} />}
       {snapshot.cellInfo && <Dashboard handle={handle} snapshot={snapshot} now={now} />}
       {snapshot.settings && <SettingsPanel handle={handle} snapshot={snapshot} />}
       <DiagnosticsPanel
@@ -132,12 +134,13 @@ function ConnectionPanel(props: {
             <option value="web-bluetooth" disabled={!props.supported}>
               Web Bluetooth
             </option>
-            <option value="demo">Demo (fixture replay)</option>
+            <option value="demo">Demo: JK-B2A16S (fixture replay)</option>
+            <option value="demo-b4a24s">Demo: JK-B4A24S capture (synthetic)</option>
           </select>
         </label>
         {!connected && (
           <button type="button" disabled={busy} onClick={() => void connect()}>
-            {props.mode === "demo" ? "Start demo" : "Scan & connect"}
+            {props.mode === "web-bluetooth" ? "Scan & connect" : "Start demo"}
           </button>
         )}
         {snapshot.connection === "RECONNECT_WAIT" && (
@@ -158,6 +161,12 @@ function ConnectionPanel(props: {
         </p>
       )}
       {props.mode === "demo" && <p className="muted">{DEMO_LABEL}</p>}
+      {props.mode === "demo-b4a24s" && (
+        <p className="muted">
+          SYNTHETIC: the JK-B2A16S fixtures with the model renamed, to show the JK-B4A24S diagnostic capture flow. Not a
+          JK-B4A24S measurement.
+        </p>
+      )}
       {DEV_MODE && props.mode === "web-bluetooth" && (
         <label className="muted">
           <input
@@ -203,6 +212,63 @@ function DevicePanel({ snapshot }: { snapshot: SessionSnapshot }): ReactElement 
           {formatDuration(info.uptimeSeconds)} / {info.powerOnCount}
         </dd>
       </dl>
+    </section>
+  );
+}
+
+/** Design section 44: unknown profile -> read-only diagnostic capture. */
+function CapturePanel({ handle, snapshot }: { handle: SessionHandle; snapshot: SessionSnapshot }): ReactElement {
+  const frames = Object.entries(snapshot.capturedFrames);
+  const cell = snapshot.capturedFrames.CELL_INFO;
+  const hint = cell ? cellLayoutHint(parseHex(cell.hex)) : null;
+  const exportCapture = (): void => {
+    const report = buildDebugExport({
+      environment: { appVersion: APP_VERSION, platform: `web/${handle.mode}`, userAgent: navigator.userAgent },
+      snapshot,
+      events: handle.session.events,
+    });
+    download(debugExportFileName().replace("debug", "capture"), "application/json", JSON.stringify(report, null, 2));
+  };
+  return (
+    <section className="panel">
+      <h2>
+        Protocol capture <span className="badge warn">DIAGNOSTIC</span>
+      </h2>
+      <p className="muted">
+        This device's BLE protocol is not confirmed, so values are not decoded or shown. Leave it connected until
+        CELL_INFO and SETTINGS appear below, then export the capture and hand it to the developer.
+      </p>
+      <dl className="kv">
+        {frames.length === 0 ? (
+          <>
+            <dt>Frames</dt>
+            <dd>waiting...</dd>
+          </>
+        ) : (
+          frames.map(([type, f]) => (
+            <span key={type} style={{ display: "contents" }}>
+              <dt>{type}</dt>
+              <dd>
+                {f.count} frame(s), last {new Date(f.at).toLocaleTimeString()}
+              </dd>
+            </span>
+          ))
+        )}
+        {hint && (
+          <>
+            <dt>Layout hint</dt>
+            <dd>
+              {hint.likely} (JK04 reading: {hint.jk04PlausibleCells} plausible cells, JK02 reading:{" "}
+              {hint.jk02PlausibleCells}) - hint only, confirm against the official app
+            </dd>
+          </>
+        )}
+      </dl>
+      <div className="row">
+        <button type="button" disabled={frames.length === 0} onClick={exportCapture}>
+          Export capture JSON
+        </button>
+      </div>
     </section>
   );
 }
