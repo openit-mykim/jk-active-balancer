@@ -26,28 +26,30 @@ PWA로 동작합니다.
 min/max/delta/average, 밸런서 상태·전류, 설정 읽기, raw 패킷 로거, fixture
 리플레이, Android/iOS/PWA 빌드.
 
-제외: **설정 쓰기(Write)** 와 다른 JK 모델. 설정 쓰기는 Phase 2의 화이트리스트
-전용 기능입니다(설계 §15). 인터페이스(`JkSettingsWriter`)만 존재하고 모든 메서드는
-거부됩니다.
+제외: 다른 JK 모델, 그리고 **활성화된** 설정 쓰기. 업스트림이 JK04에 정의한 유일한
+레지스터(밸런서 스위치 `0x6C`)에 대한 쓰기 경로와 read-back 검증은 구현되어 있지만,
+실장비 검증 전까지 장치 프로파일에서 비활성입니다(설계 §15, 결정 D011). 밸런스
+시작/델타 전압은 업스트림에 JK04 쓰기 레지스터가 없습니다.
 
 ## 모노레포 구조
 
 ```text
 apps/web            Vite + React + TS, Web Bluetooth PWA
-apps/mobile         React Native 골격
+apps/mobile         React Native 0.87.1 앱(Android + iOS), npm 프로젝트
 packages/jk-protocol     JK04 상수·CRC·프레임·디코더·프로파일
-packages/ble-core        BleTransport·상태머신·재접속·파이프라인·Mock
+packages/ble-core        BleTransport·BmsSession·워치독·로거·디버그 export·Mock
 packages/ble-web         Web Bluetooth 어댑터
-packages/ble-react-native react-native-ble-plx 어댑터(구조)
-packages/device-model    배터리/셀/밸런서 도메인 모델
-packages/ui-common       셀 그리드 레이아웃 헬퍼
+packages/ble-react-native react-native-ble-plx 어댑터
+packages/device-model    도메인 모델·통계·히스토리/CSV
+packages/ui-common       셀 그리드 레이아웃·색상 임계값
 fixtures/jk-b2a16s       device-info / settings / status / malformed
 docs/                    프로토콜 설계·결정 로그·업스트림 고정
-.github/workflows/ci.yml lint / typecheck / unit-test / web-build
+.github/workflows/ci.yml lint / typecheck / unit-test / web-build / android-build / ios-build
 ```
 
-`apps/mobile`은 골격만 있고 아직 pnpm 워크스페이스 멤버가 아닙니다. Phase 1
-설치를 가볍고 결정적으로 유지하기 위한 결정입니다(`docs/decision-log.md` D005).
+`apps/mobile`은 pnpm 워크스페이스 밖의 독립 npm 프로젝트이며, `packages/*`를
+Metro를 통해 TypeScript 소스로 사용합니다(`docs/decision-log.md` D005, D013,
+`apps/mobile/README.md`).
 
 ## 개발
 
@@ -81,13 +83,14 @@ tag 3.0.0   commit b3016df3799095c0760e0a578d04dc7185a1c74a   Apache-2.0
 
 ## 현재 상태
 
-Phase 1 초기 스캐폴드입니다. JK04 코덱, 프레임 조립기, device-info/cell-info
-디코더와 도메인·전송 계층은 구현되어 있고 실제 업스트림 프레임 기반 테스트를
-통과합니다. 실장비 캡처와 네이티브 빌드는 `PROJECT_STATUS.md`에 추적됩니다.
+Phase 1 소프트웨어 구현 완료: JK04 코덱, 설정/device-info/cell-info 디코더,
+재접속·워치독을 갖춘 연결 세션, raw 로거, 디버그 export, fixture 리플레이, Web
+Bluetooth 대시보드, React Native 앱. 모두 업스트림 문서화 프레임으로 테스트했으며
+**실장비 JK-B2A16S 검증은 아직 없습니다**. `PROJECT_STATUS.md`를 참고하십시오.
 
 ## 안전
 
-설정 쓰기는 배터리 안전에 영향을 줄 수 있습니다. Phase 1은 장치에 절대 쓰지
+설정 쓰기는 배터리 안전에 영향을 줄 수 있습니다. 배포 프로파일은 장치에 절대 쓰지
 않습니다. 향후 쓰기 경로는 capability 게이트·화이트리스트·staged 검증·read-back을
 모두 통과해야 하며, BLE 쓰기 성공만으로 올바른 설정이라고 판단하지 않습니다.
 

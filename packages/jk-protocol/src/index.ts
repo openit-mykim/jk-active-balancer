@@ -1,5 +1,6 @@
 export * from "./jk04/constants";
 export * from "./jk04/crc";
+export * from "./jk04/hex";
 export * from "./jk04/frame-builder";
 export * from "./jk04/frame-assembler";
 export * from "./jk04/decoder-device-info";

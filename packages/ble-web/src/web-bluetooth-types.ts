@@ -8,10 +8,14 @@
 
 export interface WebBluetoothCharacteristic {
   value: DataView | null;
+  properties?: { write?: boolean; writeWithoutResponse?: boolean; notify?: boolean };
   startNotifications(): Promise<WebBluetoothCharacteristic>;
-  writeValueWithoutResponse(value: Uint8Array): Promise<void>;
+  stopNotifications?(): Promise<WebBluetoothCharacteristic>;
+  writeValueWithoutResponse?(value: Uint8Array): Promise<void>;
+  writeValueWithResponse?(value: Uint8Array): Promise<void>;
   writeValue(value: Uint8Array): Promise<void>;
   addEventListener(type: string, listener: (event: Event) => void): void;
+  removeEventListener(type: string, listener: (event: Event) => void): void;
 }
 
 export interface WebBluetoothService {
@@ -30,6 +34,7 @@ export interface WebBluetoothDevice {
   name?: string;
   gatt?: WebBluetoothGattServer;
   addEventListener(type: string, listener: (event: Event) => void): void;
+  removeEventListener(type: string, listener: (event: Event) => void): void;
 }
 
 export interface WebBluetooth {

@@ -63,3 +63,183 @@ dd {
   word-break: break-all;
   font-family: ui-monospace, monospace;
 }
+
+h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.1rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.95rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.small {
+  font-size: 0.75rem;
+}
+
+.error {
+  color: #ff8a8a;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.5rem 0;
+}
+
+button,
+select,
+input[type="number"] {
+  background: #1b2742;
+  color: inherit;
+  border: 1px solid #2c3d63;
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+}
+
+input[type="number"] {
+  width: 5rem;
+  padding: 0.2rem 0.4rem;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  background: #24324f;
+  font-weight: 600;
+}
+
+.badge.ok,
+.badge.state-streaming,
+.badge.state-ready {
+  background: #1f5136;
+}
+
+.badge.warn,
+.badge.state-reconnect_wait,
+.badge.state-error {
+  background: #6a4a12;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+
+.kv dd {
+  margin: 0;
+  font-family: inherit;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.stat {
+  background: #0e1729;
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  display: grid;
+}
+
+.stat-label {
+  color: #8fa3bf;
+  font-size: 0.75rem;
+}
+
+.stat-value {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-stale .stat-value,
+.is-stale .cell-value {
+  opacity: 0.55;
+}
+
+button.cell {
+  border: 1px solid transparent;
+  text-align: left;
+  width: 100%;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.cell.warn {
+  border-color: #b8862a;
+}
+
+.cell.alert {
+  border-color: #d05050;
+}
+
+.cell.selected {
+  outline: 2px solid #5b8cff;
+}
+
+.cell-value small {
+  color: #8fa3bf;
+}
+
+.detail {
+  margin-top: 0.75rem;
+  background: #0e1729;
+  border-radius: 8px;
+  padding: 0.6rem;
+}
+
+.spark {
+  margin: 0.25rem 0 0.5rem;
+  color: #5b8cff;
+}
+
+.spark svg {
+  width: 100%;
+  height: 80px;
+  background: #0e1729;
+  border-radius: 8px;
+}
+
+.log {
+  max-height: 320px;
+  overflow: auto;
+  background: #070c17;
+  border-radius: 8px;
+  padding: 0.6rem;
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 3-column grids (17-24S) on a portrait phone: compact typography (design 45). */
+@media (max-width: 480px) {
+  .app {
+    padding: 0.75rem;
+  }
+  .grid .cell {
+    font-size: 0.78rem;
+    padding: 0.3rem 0.35rem;
+    flex-direction: column;
+  }
+}

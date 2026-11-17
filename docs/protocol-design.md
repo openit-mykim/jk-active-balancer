@@ -146,25 +146,51 @@ uptime `36867600` s, power-on count `19`, name `BMS`, device passcode `1234`.
 | 222 | 4 | balancing current, float32 LE |
 | 286 | 4 | uptime seconds, uint32 LE |
 
-Statistics follow upstream: only cells with a non-zero voltage count towards
-the average, and the minimum is taken over non-zero cells only.
+Statistics follow upstream `decode_jk04_cell_info_()` (decision D010): only
+cells with a non-zero voltage count towards the average and the minimum, delta
+is `max - min`, and the pack voltage is the sum of all cell slots. The frame's
+own floats at 202/206 are not published upstream; this repository exposes them
+as `reportedAverageCellVoltage` / `reportedDeltaCellVoltage` for diagnostics.
 
 `Cell Wire Resistance` is reported by the parser but is a diagnostic value; the
 UI only shows it, never acts on it (design section 42).
 
-## Settings frame (type 0x01) and writes
+## Settings frame (type 0x01)
 
-Phase 1 is **read-only + diagnostics** (design sections 15, 35). Therefore:
+Offsets from upstream `decode_jk04_settings_()` (JK-B2A16S v3 example, fixture
+`settings/default.upstream.hex`). Bytes upstream labels "Unknown" are not
+decoded.
 
-- `decodeSettings()` throws `DecoderNotVerifiedError` rather than risk a wrong
-  decode;
-- `createSettingsWriter()` returns a `JkSettingsWriter` whose every method
-  rejects with `SettingsWriteDisabledError`.
+| Offset | Size | Field | Fixture value |
+|---:|---:|---|---|
+| 34 | 1 | cell count | 16 |
+| 38 | 4 | power-off voltage, float32 LE | 3.000 V |
+| 98 | 4 | start balance voltage, float32 LE | 4.250 V |
+| 106 | 4 | trigger delta voltage, float32 LE | 0.005 V |
+| 110 | 4 | max balance current, float32 LE | 2.0 A |
+| 114 | 1 | balancer switch (`!= 0` = on) | on |
 
-Settings **write** is Phase 2, whitelist registers only. A register may only be
-writable once its address, unit, range and read-back verification are all
-validated (design section 15). There is deliberately no raw
-`writeRegister(address, value)` in the public API.
+Upstream sends no dedicated settings command for JK04: the settings frame
+arrives after `0x96`, ahead of the cell-info stream. `BmsSession.readSettings()`
+re-sends `0x96` and waits for the next settings frame.
+
+## Settings write (whitelist)
+
+Only one JK04 register is defined upstream (`switch/__init__.py`, JK04 column):
+
+```text
+balancer switch : write_register(0x6C, 1 | 0, length 1)
+  on  -> AA 55 90 EB 6C 01 01 00 00 00 00 00 00 00 00 00 00 00 00 E8
+  off -> AA 55 90 EB 6C 01 00 00 00 00 00 00 00 00 00 00 00 00 00 E7
+```
+
+Every JK04 number register (including balancing start voltage and balance
+trigger voltage) is `0x00` = unsupported upstream, so those writes are rejected
+for JK04. A write is attempted only when the profile grants `settingsWrite` and
+`balancerSwitch`, and it succeeds only after the read-back settings frame shows
+the written value. The shipped JK-B2A16S profile keeps both flags `false` (NOT
+HARDWARE VERIFIED). There is deliberately no raw `writeRegister(address, value)`
+in the public API. See decision D011.
 
 ## Fixtures
 

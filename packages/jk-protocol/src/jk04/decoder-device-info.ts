@@ -1,4 +1,4 @@
-import { FRAME_TYPE_DEVICE_INFO, RESPONSE_HEADER } from "./constants";
+import { FRAME_TYPE_DEVICE_INFO, RESPONSE_FRAME_SIZE, RESPONSE_HEADER } from "./constants";
 
 /**
  * Decoded JK04 device-info frame (response frame type 0x03).
@@ -64,7 +64,7 @@ function readUint32LE(frame: Uint8Array, offset: number): number {
 /** True when `frame` is a complete JK04 device-info frame (header + type 0x03). */
 export function isDeviceInfoFrame(frame: Uint8Array): boolean {
   return (
-    frame.length >= 5 &&
+    frame.length >= RESPONSE_FRAME_SIZE &&
     frame[0] === RESPONSE_HEADER[0] &&
     frame[1] === RESPONSE_HEADER[1] &&
     frame[2] === RESPONSE_HEADER[2] &&

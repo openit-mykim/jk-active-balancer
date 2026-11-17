@@ -1,17 +1,46 @@
-# apps/mobile (skeleton)
+# apps/mobile
 
-React Native shell for the JK-B2A16S active balancer app (Android/iOS).
+React Native 0.87.1 app for the JK-B2A16S active balancer (Android / iOS).
+Unofficial; not affiliated with JiKong. **NOT HARDWARE VERIFIED.**
 
-Phase 1 status:
+Standalone **npm** project, outside the pnpm workspace (decisions D005, D013).
+The shared packages (`packages/*`) are consumed as TypeScript source via Metro
+`extraNodeModules` and tsconfig `paths`.
 
-- Structure, `package.json` and `tsconfig.json` only (design section 5).
-- `react-native` and `react-native-ble-plx` are pinned to exact versions here
-  but are **not installed by the Phase 1 workspace install**: `apps/mobile` is
-  deliberately not a pnpm workspace member yet (docs/decision-log.md D005). The
-  native toolchain arrives with the android-build / ios-build phase.
-- BLE access goes through `@jk-active-balancer/ble-react-native`, which takes
-  the `BleManager` from `react-native-ble-plx` and never hard-codes GATT
-  handles (design section 34.5).
+## Run
 
-The shared protocol, transport and UI-layout packages are the same ones the web
-app uses; only the transport binding differs.
+```bash
+cd apps/mobile
+npm ci
+npm run typecheck
+npm start                 # Metro
+npm run android           # debug build on a connected device / emulator
+npm run ios               # macOS only: cd ios && pod install first
+```
+
+Release APK (signed with the template **debug** key - not for distribution):
+
+```bash
+cd apps/mobile/android && ./gradlew assembleRelease
+# -> app/build/outputs/apk/release/app-release.apk
+```
+
+## What the app does
+
+- Scan (FFE0 service filter) with name / RSSI / platform id, connect, disconnect.
+- `BmsSession` lifecycle: identify (0x97), profile resolution (unknown HW ->
+  read-only diagnostic mode), streaming (0x96), watchdog STALE badge, automatic
+  reconnect with backoff, manual "Reconnect now".
+- Re-check on app foreground; reconnect when Bluetooth turns back ON.
+- Pack voltage, average, min/max, delta, balancer switch + activity, balance
+  current, cell grid (8 cells/column, up to 3 columns).
+- Read-only balancer settings. Writes stay disabled until hardware read-back.
+- Raw packet logger and a shareable debug report (passcode masked).
+- Demo mode: replays the repository fixtures (`src/fixtures.generated.ts`,
+  regenerate with `npm run gen:fixtures`).
+
+## Permissions
+
+- Android 12+: `BLUETOOTH_SCAN` (neverForLocation), `BLUETOOTH_CONNECT`.
+- Android 11 and older: `BLUETOOTH`, `BLUETOOTH_ADMIN`, `ACCESS_FINE_LOCATION`.
+- iOS: `NSBluetoothAlwaysUsageDescription`, background mode `bluetooth-central`.

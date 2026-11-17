@@ -1,9 +1,32 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "jsx": "react-jsx",
-    "types": ["react"],
-    "noEmit": true
+    "strict": true,
+    "noEmit": true,
+    "paths": {
+      "@jk-active-balancer/jk-protocol": [
+        "./../../packages/jk-protocol/src/index.ts"
+      ],
+      "@jk-active-balancer/device-model": [
+        "./../../packages/device-model/src/index.ts"
+      ],
+      "@jk-active-balancer/ble-core": [
+        "./../../packages/ble-core/src/index.ts"
+      ],
+      "@jk-active-balancer/ble-react-native": [
+        "./../../packages/ble-react-native/src/index.ts"
+      ],
+      "@jk-active-balancer/ui-common": [
+        "./../../packages/ui-common/src/index.ts"
+      ]
+    },
+    "types": [
+      "react-native"
+    ]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "index.js"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "index.js"
+  ]
 }
