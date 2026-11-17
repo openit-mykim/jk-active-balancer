@@ -25,6 +25,13 @@ cd apps/mobile/android && ./gradlew assembleRelease
 # -> app/build/outputs/apk/release/app-release.apk
 ```
 
+## Screens (same structure as jbd-bms-manager, decision D016)
+
+App bar (device list · title · connection status) and five tabs:
+개요 Overview · 상세 Detail · 밸런스 Balance · 제어 Control (locked maintenance) ·
+설정 Settings, plus the 장치 Devices screen. Korean or English follows the
+system locale or the Settings choice.
+
 ## What the app does
 
 - Scan (FFE0 service filter) with name / RSSI / platform id, connect, disconnect.
