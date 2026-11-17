@@ -32,6 +32,13 @@ App bar (device list · title · connection status) and five tabs:
 설정 Settings, plus the 장치 Devices screen. Korean or English follows the
 system locale or the Settings choice.
 
+Preferences (language, cell colour thresholds, raw logger) persist with
+AsyncStorage in the shared schema-versioned format (decision D017). Design
+tokens, strings and colours come from `@jk-active-balancer/ui-common`.
+
+Release check before any upload: `scripts/release-guard.sh <apk>` (fails on a
+debug-signed APK; release signing is not configured yet).
+
 ## What the app does
 
 - Scan (FFE0 service filter) with name / RSSI / platform id, connect, disconnect.

@@ -122,6 +122,34 @@ const ko = {
   groupOther: "기타",
   appInfo: "앱 정보",
   appInfoBody: "비공식 앱 · JiKong과 무관 · 실장비 미검증",
+  rangeAboveMax: "장치가 {n}셀을 보고했지만 이 제품은 최대 {max}S입니다. {max}셀까지만 표시합니다.",
+  rangeBelowMin: "장치가 {n}셀을 보고했습니다. 이 제품의 사양은 {min}S-{max}S입니다.",
+  permissionDenied: "Bluetooth 권한이 거부되어 장치를 검색할 수 없습니다. 앱 설정에서 권한을 허용하거나, 아래 데모·미리보기를 사용하세요.",
+  openAppSettings: "앱 설정 열기",
+  noName: "(이름 없음)",
+  bluetooth: "Bluetooth",
+  cellN: "셀 {n}",
+  langAuto: "자동",
+  privacyTitle: "권한·개인정보",
+  privacyBody: "Bluetooth는 밸런서 값을 읽는 데만 씁니다. Android 11 이하는 검색에 위치 권한이 필요합니다. 계정·서버가 없고 데이터는 이 기기 밖으로 나가지 않습니다. 디버그 보고서는 직접 공유할 때만 전달되며 장치 비밀번호는 가려집니다.",
+  version: "버전",
+  durationDHM: "{d}일 {h}시간 {m}분",
+  state_IDLE: "대기",
+  state_SCANNING: "검색 중",
+  state_CONNECTING: "연결 중",
+  state_DISCOVERING: "서비스 검색 중",
+  state_SUBSCRIBING: "알림 설정 중",
+  state_IDENTIFYING: "장치 식별 중",
+  state_READY: "준비됨",
+  state_STREAMING: "수신 중",
+  state_ERROR: "오류",
+  state_RECONNECT_WAIT: "재연결 대기",
+  freshness_none: "없음",
+  freshness_fresh: "최신",
+  freshness_stale: "지연",
+  freshness_stalled: "중단",
+  prefsReset: "저장된 설정을 읽을 수 없어 기본값으로 시작했습니다.",
+  deviceId: "장치 ID",
   webBluetoothUnsupported: "이 브라우저는 Web Bluetooth를 지원하지 않습니다. 데스크톱·Android의 Chrome/Edge(HTTPS)를 사용하세요. iPhone은 네이티브 앱을 사용하세요.",
 };
 
@@ -247,6 +275,34 @@ const en: Record<StringKey, string> = {
   groupOther: "Other",
   appInfo: "App info",
   appInfoBody: "Unofficial · not affiliated with JiKong · not hardware verified",
+  rangeAboveMax: "The device reports {n} cells but this product supports at most {max}S. Showing {max}.",
+  rangeBelowMin: "The device reports {n} cells; this product is specified for {min}S-{max}S.",
+  permissionDenied: "Bluetooth permission was denied, so devices cannot be scanned. Allow it in app settings, or use the demos and previews below.",
+  openAppSettings: "Open app settings",
+  noName: "(no name)",
+  bluetooth: "Bluetooth",
+  cellN: "Cell {n}",
+  langAuto: "Auto",
+  privacyTitle: "Permissions & privacy",
+  privacyBody: "Bluetooth is used only to read the balancer. Android 11 and older need location permission to scan. There is no account or server; data never leaves this device. A debug report is sent only when you share it, with the device passcode masked.",
+  version: "Version",
+  durationDHM: "{d}d {h}h {m}m",
+  state_IDLE: "Idle",
+  state_SCANNING: "Scanning",
+  state_CONNECTING: "Connecting",
+  state_DISCOVERING: "Discovering",
+  state_SUBSCRIBING: "Subscribing",
+  state_IDENTIFYING: "Identifying",
+  state_READY: "Ready",
+  state_STREAMING: "Streaming",
+  state_ERROR: "Error",
+  state_RECONNECT_WAIT: "Reconnect wait",
+  freshness_none: "none",
+  freshness_fresh: "fresh",
+  freshness_stale: "stale",
+  freshness_stalled: "stalled",
+  prefsReset: "Saved settings could not be read; started with defaults.",
+  deviceId: "Device ID",
   webBluetoothUnsupported: "This browser has no Web Bluetooth. Use Chrome or Edge on desktop or Android over HTTPS. On iPhone use the native app.",
 };
 
@@ -268,4 +324,26 @@ export function translate(language: Language, key: StringKey, params: Record<str
 
 export function tabLabel(language: Language, tab: string): string {
   return translate(language, `tab_${tab}` as StringKey);
+}
+
+/** Localised connection-state name (never show the raw enum to users). */
+export function stateLabel(language: Language, state: string): string {
+  return translate(language, `state_${state}` as StringKey);
+}
+
+export function freshnessLabel(language: Language, freshness: string): string {
+  return translate(language, `freshness_${freshness}` as StringKey);
+}
+
+export function formatDuration(language: Language, seconds: number): string {
+  return translate(language, "durationDHM", {
+    d: Math.floor(seconds / 86400),
+    h: Math.floor((seconds % 86400) / 3600),
+    m: Math.floor((seconds % 3600) / 60),
+  });
+}
+
+/** Wording for a `checkCellRange` failure. */
+export function cellRangeMessage(language: Language, r: { kind: "below-min" | "above-max"; reported: number; minCells: number; maxCells: number }): string {
+  return translate(language, r.kind === "above-max" ? "rangeAboveMax" : "rangeBelowMin", { n: r.reported, min: r.minCells, max: r.maxCells });
 }

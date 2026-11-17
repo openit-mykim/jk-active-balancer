@@ -1,5 +1,6 @@
 import { type ReactElement, useState } from "react";
 import { historyToCsv } from "@jk-active-balancer/device-model";
+import { formatDuration, freshnessLabel, stateLabel } from "@jk-active-balancer/ui-common";
 import { Icon } from "../icons";
 import { Sparkline } from "../Sparkline";
 import { Card, EmptyState, Row, Segmented, download } from "../ui";
@@ -8,12 +9,6 @@ import type { ScreenProps } from "./context";
 
 type Series = "pack" | "delta" | "current";
 
-function formatDuration(seconds: number): string {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return `${d}d ${h}h ${m}m`;
-}
 
 /** 상세: device and product information plus local history (jbd-bms-manager Detail). */
 export function Detail(p: ScreenProps): ReactElement {
@@ -71,7 +66,7 @@ export function Detail(p: ScreenProps): ReactElement {
             <Row label={t("model")} value={info.vendorId} />
             <Row label={t("hwSw")} value={`${info.hardwareVersion} / ${info.softwareVersion}`} />
             <Row label={t("name")} value={info.deviceName || "-"} />
-            <Row label={t("uptime")} value={formatDuration(info.uptimeSeconds)} />
+            <Row label={t("uptime")} value={formatDuration(p.language, info.uptimeSeconds)} />
             <Row label={t("powerOnCount")} value={String(info.powerOnCount)} />
           </Card>
           <Card title={t("groupProduct")}>
@@ -94,10 +89,10 @@ export function Detail(p: ScreenProps): ReactElement {
             {s.profile && <p className="muted small">{s.profile.reason}</p>}
           </Card>
           <Card title={t("groupConnection")}>
-            <Row label={t("state")} value={s.connection} />
-            <Row label={t("frames")} value={String(s.framesReceived)} />
+            <Row label={t("state")} value={stateLabel(p.language, s.connection)} />
+            <Row label={t("frames")} value={`${s.framesReceived} · ${freshnessLabel(p.language, s.freshness)}`} />
             <Row label={t("parserErrors")} value={String(s.parserErrors.length)} />
-            <Row label="ID" value={s.device?.id ?? "-"} />
+            <Row label={t("deviceId")} value={s.device?.id ?? "-"} />
           </Card>
         </>
       )}

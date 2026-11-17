@@ -107,6 +107,7 @@ interface badges); every product can be previewed with SYNTHETIC frames.
 - Default target device: JK-B4A24S, capture-first (D014); JK-B2A16S remains the verified-by-upstream JK04 profile.
 - Five products supported with spec-driven UI; protocols other than JK-B2A16S are confirmed by capture (D015).
 - UI follows jbd-bms-manager: app bar + 개요/상세/밸런스/제어/설정 + 장치 screen, Korean/English (D016).
+- Wiki mobile standard applied (tokens, persisted prefs with schema version, a11y, i18n, release guard) — `docs/mobile-standard-audit.md` (D017). Stack exception (RN) awaits approval: `docs/adr/0001-mobile-stack-exception.md`.
 - Primary transport: BLE (Web Bluetooth on Chrome, react-native-ble-plx on mobile).
 - Local-first; no account or cloud.
 - JK-B2A16S / JK04 only in Phase 1.

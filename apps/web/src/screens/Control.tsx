@@ -1,11 +1,11 @@
 import { type ReactElement, useState } from "react";
 import { buildDebugExport, debugExportFileName } from "@jk-active-balancer/ble-core";
 import { cellLayoutHint, parseHex } from "@jk-active-balancer/jk-protocol";
+import { freshnessLabel } from "@jk-active-balancer/ui-common";
 import { Icon } from "../icons";
 import { Card, EmptyState, Row, Toggle, download, fmt } from "../ui";
 import type { ScreenProps } from "./context";
 
-const APP_VERSION = "0.1.0";
 
 /**
  * 제어: the locked maintenance workspace (jbd-bms-manager Control). Holds the
@@ -30,7 +30,7 @@ export function Control(p: ScreenProps): ReactElement {
 
   const exportReport = (raw: boolean, kind: "debug" | "capture"): void => {
     const report = buildDebugExport({
-      environment: { appVersion: APP_VERSION, platform: `web/${handle.mode}`, userAgent: navigator.userAgent },
+      environment: { appVersion: p.appVersion, platform: `web/${handle.mode}`, userAgent: navigator.userAgent },
       snapshot: s,
       events: handle.session.events,
       packetLog: handle.logger.entries,
@@ -107,7 +107,7 @@ export function Control(p: ScreenProps): ReactElement {
       </Card>
 
       <Card title={t("diagnostics")}>
-        <Row label={t("frames")} value={`${s.framesReceived} · ${s.freshness}`} />
+        <Row label={t("frames")} value={`${s.framesReceived} · ${freshnessLabel(p.language, s.freshness)}`} />
         <Row label={t("parserErrors")} value={String(s.parserErrors.length)} />
         <div className="inline-toggle">
           <span>{t("rawLogger")}</span>

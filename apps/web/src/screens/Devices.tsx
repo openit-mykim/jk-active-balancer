@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { DEFAULT_TARGET_PROFILE, KNOWN_PROFILES } from "@jk-active-balancer/jk-protocol";
+import { stateLabel } from "@jk-active-balancer/ui-common";
 import { Icon } from "../icons";
 import { EmptyState, ListItem } from "../ui";
 import type { ScreenProps } from "./context";
@@ -18,7 +19,7 @@ export function Devices(p: ScreenProps & { error: string | null }): ReactElement
         <ListItem
           icon={<Icon name="control" />}
           title={s.device?.name ?? s.device?.id ?? "-"}
-          body={s.connection}
+          body={stateLabel(p.language, s.connection)}
           trailing={
             <button type="button" className="btn-outlined" onClick={() => void handle.session.disconnect()}>
               {t("disconnect")}
@@ -27,7 +28,7 @@ export function Devices(p: ScreenProps & { error: string | null }): ReactElement
         />
       )}
 
-      <div className="group-title">Bluetooth</div>
+      <div className="group-title">{t("bluetooth")}</div>
       {p.webBluetooth ? (
         s.connection === "SCANNING" ? (
           <EmptyState icon={<Icon name="bluetoothSearch" size={72} />} title={t("scanning")} body={t("scanHint")} />

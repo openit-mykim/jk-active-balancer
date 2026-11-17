@@ -1,45 +1,50 @@
 import { useEffect, useState } from "react";
 import {
-  DEFAULT_CELL_COLOR_THRESHOLDS,
+  DEFAULT_PREFS,
+  PREFS_STORAGE_KEY,
+  parsePrefs,
   resolveLanguage,
+  serializePrefs,
   translate,
-  type CellColorThresholds,
+  type AppPrefs,
   type Language,
-  type LanguagePreference,
   type StringKey,
 } from "@jk-active-balancer/ui-common";
 
-/** App preferences (the Settings tab), persisted in localStorage. */
-export interface Prefs {
-  readonly language: LanguagePreference;
-  readonly thresholds: CellColorThresholds;
-  readonly namePrefixFallback: boolean;
-  readonly loggerEnabled: boolean;
-}
+/** App preferences (the Settings tab); format + schema version shared with mobile. */
+export type Prefs = AppPrefs;
 
-const KEY = "jk-active-balancer.prefs";
-const DEFAULTS: Prefs = {
-  language: "system",
-  thresholds: DEFAULT_CELL_COLOR_THRESHOLDS,
-  namePrefixFallback: false,
-  loggerEnabled: import.meta.env.DEV,
-};
+const DEFAULTS: Prefs = { ...DEFAULT_PREFS, loggerEnabled: import.meta.env.DEV };
 
-function load(): Prefs {
+function load(): { prefs: Prefs; reset: boolean } {
+  let raw: string | null = null;
   try {
-    const stored = JSON.parse(localStorage.getItem(KEY) ?? "null") as Partial<Prefs> | null;
-    return { ...DEFAULTS, ...stored, thresholds: { ...DEFAULTS.thresholds, ...stored?.thresholds } };
+    raw = localStorage.getItem(PREFS_STORAGE_KEY);
   } catch {
-    return DEFAULTS;
+    return { prefs: DEFAULTS, reset: true };
   }
+  const { prefs, status } = parsePrefs(raw, DEFAULTS);
+  if (status === "discarded") {
+    try {
+      localStorage.removeItem(PREFS_STORAGE_KEY);
+    } catch {
+      // storage unavailable: keep defaults
+    }
+  }
+  return { prefs, reset: status === "discarded" };
 }
 
-export function usePrefs(): [Prefs, (patch: Partial<Prefs>) => void] {
-  const [prefs, setPrefs] = useState<Prefs>(load);
+export function usePrefs(): [Prefs, (patch: Partial<Prefs>) => void, boolean] {
+  const [initial] = useState(load);
+  const [prefs, setPrefs] = useState<Prefs>(initial.prefs);
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(prefs));
+    try {
+      localStorage.setItem(PREFS_STORAGE_KEY, serializePrefs(prefs));
+    } catch {
+      // private mode / quota: preferences stay in memory
+    }
   }, [prefs]);
-  return [prefs, (patch) => setPrefs((p) => ({ ...p, ...patch }))];
+  return [prefs, (patch) => setPrefs((p) => ({ ...p, ...patch })), initial.reset];
 }
 
 export type T = (key: StringKey, params?: Record<string, string | number>) => string;

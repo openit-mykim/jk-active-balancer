@@ -99,18 +99,25 @@ export function resolveActiveCellCount(input: {
 /** Result of checking a reported cell count against the product's range. */
 export type CellRangeCheck =
   | { readonly ok: true }
-  | { readonly ok: false; readonly kind: "below-min" | "above-max"; readonly message: string };
+  | {
+      readonly ok: false;
+      readonly kind: "below-min" | "above-max";
+      readonly reported: number;
+      readonly minCells: number;
+      readonly maxCells: number;
+    };
 
 /**
  * Compare the cell count the device reports with the product's supported
- * range (e.g. JK-B4A24S 8S-24S). The UI shows the message; nothing is hidden.
+ * range (e.g. JK-B4A24S 8S-24S). The UI words the result (no strings here);
+ * nothing is hidden.
  */
 export function checkCellRange(reported: number, range: { readonly minCells: number; readonly maxCells: number }): CellRangeCheck {
   if (reported > range.maxCells) {
-    return { ok: false, kind: "above-max", message: `Device reports ${reported} cells; this product supports at most ${range.maxCells}S. Showing ${range.maxCells}.` };
+    return { ok: false, kind: "above-max", reported, minCells: range.minCells, maxCells: range.maxCells };
   }
   if (reported > 0 && reported < range.minCells) {
-    return { ok: false, kind: "below-min", message: `Device reports ${reported} cells; this product is specified for ${range.minCells}S-${range.maxCells}S.` };
+    return { ok: false, kind: "below-min", reported, minCells: range.minCells, maxCells: range.maxCells };
   }
   return { ok: true };
 }

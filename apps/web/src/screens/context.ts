@@ -15,6 +15,8 @@ export interface ScreenProps {
   readonly openDevices: () => void;
   readonly startMode: (mode: TransportMode) => void;
   readonly webBluetooth: boolean;
+  readonly appVersion: string;
+  readonly prefsReset: boolean;
 }
 
 /** True once the session holds anything worth showing. */

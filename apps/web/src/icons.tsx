@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { THEME } from "@jk-active-balancer/ui-common";
 
 /** Simple hand-drawn 24px icons (no third-party icon set). */
 const paths: Record<string, ReactElement> = {
@@ -68,8 +69,8 @@ const paths: Record<string, ReactElement> = {
   info: (
     <>
       <circle cx="12" cy="12" r="10" />
-      <rect x="11" y="10" width="2" height="7" fill="#121212" />
-      <rect x="11" y="6.5" width="2" height="2" fill="#121212" />
+      <rect x="11" y="10" width="2" height="7" fill={THEME.background} />
+      <rect x="11" y="6.5" width="2" height="2" fill={THEME.background} />
     </>
   ),
   bluetoothSearch: (
@@ -86,9 +87,9 @@ const paths: Record<string, ReactElement> = {
   ),
   palette: (
     <>
-      <rect x="3" y="6" width="5" height="12" rx="1" fill="#2e7d32" />
-      <rect x="9.5" y="6" width="5" height="12" rx="1" fill="#ef6c00" />
-      <rect x="16" y="6" width="5" height="12" rx="1" fill="#c62828" />
+      <rect x="3" y="6" width="5" height="12" rx="1" fill={THEME.band.normal} />
+      <rect x="9.5" y="6" width="5" height="12" rx="1" fill={THEME.band.caution} />
+      <rect x="16" y="6" width="5" height="12" rx="1" fill={THEME.band.danger} />
     </>
   ),
   code: <path d="M8.6 16.6L4 12l4.6-4.6L7.2 6 1.2 12l6 6zm6.8 0L20 12l-4.6-4.6L16.8 6l6 6-6 6z" />,

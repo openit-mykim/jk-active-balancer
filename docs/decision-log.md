@@ -292,3 +292,24 @@ View-drawn padlock) - no third-party icon set or native SVG dependency.
 
 Mobile preferences are in memory only (no storage dependency yet); web
 preferences persist in localStorage.
+
+## D017 - Wiki mobile development standard applied; preferences persisted
+
+Decision: the apps follow the wiki "모바일 앱 개발 표준" (2026-11-10) wherever
+the current stack allows; the full checklist is `docs/mobile-standard-audit.md`.
+
+- Preferences persist on mobile (`@react-native-async-storage/async-storage`
+  3.1.1) and web (localStorage) in one shared format with a schema version
+  (`PREFS_SCHEMA_VERSION`, ui-common `prefs.ts`). Unreadable, legacy or future
+  records are discarded and defaults are used; start-up never fails (5.4).
+- Design tokens (type scale 11-28, spacing multiples of 4, component sizes,
+  colour roles) live in ui-common; the web publishes them as CSS variables at
+  runtime. `tests/design-tokens.test.ts` rejects literal font sizes, spacing
+  and hex colours in app code and checks WCAG AA contrast (5.7).
+- App version has one source: `apps/mobile/package.json` (Android Gradle reads
+  it, a test keeps iOS `MARKETING_VERSION` equal). `scripts/release-guard.sh`
+  blocks debug-signed or secret-bearing APKs before any upload (7).
+
+Open: the stack itself (React Native vs Kotlin + KMP) conflicts with the
+standard; the exception is proposed in `docs/adr/0001-mobile-stack-exception.md`
+and needs the owner's approval.

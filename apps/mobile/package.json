@@ -13,6 +13,7 @@
     "build:android": "cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "3.1.1",
     "react": "19.2.3",
     "react-native": "0.87.1",
     "react-native-ble-plx": "3.5.1",
