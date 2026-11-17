@@ -2,7 +2,7 @@ import { type ReactElement, useState } from "react";
 import { Pressable, View } from "react-native";
 import { resolveActiveCellCount } from "@jk-active-balancer/device-model";
 import { SPACE, SIZE, THEME, cellBand, classifyCellVoltage, computeCellGridLayout } from "@jk-active-balancer/ui-common";
-import { BarChart, Card, EmptyState, Illustration, Metric, MetricGrid, Row, Toggle, Txt, fmt, st } from "../ui";
+import { BarChart, Card, EmptyState, Illustration, Metric, MetricGrid, Row, ToggleRow, Txt, fmt, st } from "../ui";
 import type { ScreenProps } from "./context";
 
 /** 밸런스 (jbd-bms-manager Balance). */
@@ -71,12 +71,7 @@ export function Balance(p: ScreenProps): ReactElement {
 
       <Card dim={stale} title={`${t("cellVoltages")} · ${spec ? t("ofRange", { n: activeCells, min: spec.minCells, max: spec.maxCells }) : `${activeCells}S`}`}>
         {snap.profile?.profile?.capabilities.cellWireResistance && (
-          <View style={st.inlineToggle}>
-            <Txt role="label" color="onSurfaceMuted">
-              {t("showWireResistance")}
-            </Txt>
-            <Toggle label={t("showWireResistance")} value={showResistance} onChange={setShowResistance} />
-          </View>
+          <ToggleRow label={t("showWireResistance")} value={showResistance} onChange={setShowResistance} />
         )}
         <View style={{ flexDirection: "row", gap: SPACE.sm }}>
           {columns.map((column, c) => (

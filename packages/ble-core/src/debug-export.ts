@@ -17,6 +17,8 @@ export interface DebugExportInput {
   /** Raw packet log; only included when `includeRawFrames` is set. */
   readonly packetLog?: readonly PacketLogEntry[];
   readonly includeRawFrames?: boolean;
+  /** Local crash records (app-level), included as-is. */
+  readonly crashes?: readonly unknown[];
   readonly now?: number;
 }
 
@@ -93,6 +95,7 @@ export function buildDebugExport(input: DebugExportInput): Record<string, unknow
     },
     bleConnectionEvents: input.events,
     parserErrors: snapshot.parserErrors,
+    crashes: input.crashes ?? [],
     // Latest raw frame per type; the device passcode is masked. Always
     // included so a diagnostic-mode capture needs no extra switch.
     capturedFrames: Object.fromEntries(

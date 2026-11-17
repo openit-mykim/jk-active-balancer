@@ -1,9 +1,10 @@
-import { type ReactElement, useState } from "react";
+import { type ReactElement, useState, useSyncExternalStore } from "react";
 import { buildDebugExport, debugExportFileName } from "@jk-active-balancer/ble-core";
 import { cellLayoutHint, parseHex } from "@jk-active-balancer/jk-protocol";
 import { freshnessLabel } from "@jk-active-balancer/ui-common";
 import { Icon } from "../icons";
 import { Card, EmptyState, Row, Toggle, download, fmt } from "../ui";
+import { clearCrashes, getCrashes, subscribeCrashes } from "../crash-store";
 import type { ScreenProps } from "./context";
 
 
@@ -17,6 +18,7 @@ export function Control(p: ScreenProps): ReactElement {
   const [unlocked, setUnlocked] = useState(false);
   const [includeRaw, setIncludeRaw] = useState(false);
   const [busy, setBusy] = useState(false);
+  const crashes = useSyncExternalStore(subscribeCrashes, getCrashes);
 
   if (!unlocked) {
     return (
@@ -35,6 +37,7 @@ export function Control(p: ScreenProps): ReactElement {
       events: handle.session.events,
       packetLog: handle.logger.entries,
       includeRawFrames: raw,
+      crashes,
     });
     download(debugExportFileName().replace("debug", kind), "application/json", JSON.stringify(report, null, 2));
   };
@@ -104,6 +107,23 @@ export function Control(p: ScreenProps): ReactElement {
         >
           {t("readSettings")}
         </button>
+      </Card>
+
+      <Card title={t("crashLog")}>
+        {crashes.length === 0 ? (
+          <p className="muted">{t("crashLogEmpty")}</p>
+        ) : (
+          crashes
+            .slice(-3)
+            .reverse()
+            .map((c) => <Row key={c.at + c.message} label={`${c.at.slice(0, 16).replace("T", " ")} · ${c.kind}`} value={c.message} />)
+        )}
+        <p className="muted small">{t("crashLogNote")}</p>
+        {crashes.length > 0 && (
+          <button type="button" className="btn-text" onClick={clearCrashes}>
+            {t("clearCrashLog")}
+          </button>
+        )}
       </Card>
 
       <Card title={t("diagnostics")}>

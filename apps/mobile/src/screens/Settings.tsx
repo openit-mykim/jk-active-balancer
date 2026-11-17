@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import { MAX_FONT_SCALE_FIXED, SIZE, SPACE, THEME, TYPE, type LanguagePreference } from "@jk-active-balancer/ui-common";
-import { GroupTitle, ListItem, Toggle, Txt } from "../ui";
+import { GroupTitle, ListItem, ToggleRow, Txt } from "../ui";
 import type { ScreenProps } from "./context";
 
 /** 설정: the app itself (jbd-bms-manager Settings). Values persist (AsyncStorage). */
@@ -88,19 +88,14 @@ export function Settings(p: ScreenProps & { prefsReset: boolean }): ReactElement
         }
       />
       <GroupTitle>{t("groupDeveloper")}</GroupTitle>
-      <ListItem
+      <ToggleRow
         glyph="code"
-        title={t("rawLogger")}
-        trailing={
-          <Toggle
-            label={t("rawLogger")}
-            value={prefs.loggerEnabled}
-            onChange={(v) => {
-              p.handle.logger.enabled = v;
-              setPrefs({ loggerEnabled: v });
-            }}
-          />
-        }
+        label={t("rawLogger")}
+        value={prefs.loggerEnabled}
+        onChange={(v) => {
+          p.handle.logger.enabled = v;
+          setPrefs({ loggerEnabled: v });
+        }}
       />
       <GroupTitle>{t("groupOther")}</GroupTitle>
       <ListItem glyph="shield" title={t("privacyTitle")} body={t("privacyBody")} />

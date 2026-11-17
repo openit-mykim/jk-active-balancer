@@ -1,6 +1,7 @@
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 import { WebBluetoothAdapter } from "@jk-active-balancer/ble-web";
 import { TABS, connectionStatusKey, tabLabel, type Screen, type Tab } from "@jk-active-balancer/ui-common";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { Icon } from "./icons";
 import { version as APP_VERSION } from "../package.json";
 import { makeT, usePrefs } from "./prefs";
@@ -95,12 +96,14 @@ export function App(): ReactElement {
       </header>
 
       <main className="content">
+        <ErrorBoundary title={t("errorTitle")} body={t("errorBody")} retry={t("retry")}>
         {screen === "overview" && <Overview {...props} />}
         {screen === "detail" && <Detail {...props} />}
         {screen === "balance" && <Balance {...props} />}
         {screen === "control" && <Control {...props} />}
         {screen === "settings" && <Settings {...props} />}
         {screen === "devices" && <Devices {...props} error={error} />}
+        </ErrorBoundary>
       </main>
 
       {!onDevices && (

@@ -3,7 +3,7 @@ import type { ReactElement, ReactNode } from "react";
 export function Card({ title, children, className }: { title?: string; children: ReactNode; className?: string }): ReactElement {
   return (
     <section className={`card ${className ?? ""}`}>
-      {title && <h3 className="card-title">{title}</h3>}
+      {title && <h2 className="card-title">{title}</h2>}
       {children}
     </section>
   );

@@ -150,6 +150,13 @@ const ko = {
   freshness_stalled: "중단",
   prefsReset: "저장된 설정을 읽을 수 없어 기본값으로 시작했습니다.",
   deviceId: "장치 ID",
+  crashLog: "오류 기록",
+  crashLogEmpty: "기록된 오류가 없습니다.",
+  crashLogNote: "오류는 이 기기에만 저장되고, 디버그 보고서를 직접 공유할 때만 함께 전달됩니다.",
+  clearCrashLog: "오류 기록 지우기",
+  errorTitle: "화면을 표시하지 못했습니다",
+  errorBody: "오류가 기록되었습니다. 다시 시도하거나 제어 탭에서 디버그 보고서를 공유해 주세요.",
+  retry: "다시 시도",
   webBluetoothUnsupported: "이 브라우저는 Web Bluetooth를 지원하지 않습니다. 데스크톱·Android의 Chrome/Edge(HTTPS)를 사용하세요. iPhone은 네이티브 앱을 사용하세요.",
 };
 
@@ -303,6 +310,13 @@ const en: Record<StringKey, string> = {
   freshness_stalled: "stalled",
   prefsReset: "Saved settings could not be read; started with defaults.",
   deviceId: "Device ID",
+  crashLog: "Error log",
+  crashLogEmpty: "No errors recorded.",
+  crashLogNote: "Errors are stored on this device only and leave it only inside a debug report you share.",
+  clearCrashLog: "Clear error log",
+  errorTitle: "Something went wrong",
+  errorBody: "The error was recorded. Try again, or share a debug report from the Control tab.",
+  retry: "Try again",
   webBluetoothUnsupported: "This browser has no Web Bluetooth. Use Chrome or Edge on desktop or Android over HTTPS. On iPhone use the native app.",
 };
 
